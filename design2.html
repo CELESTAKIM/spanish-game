@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Livability Index</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Leaflet Marker Cluster -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+
+    <style>
+        :root {
+            --primary-green: #2ecc71;
+            --primary-yellow: #f1c40f;
+            --dark-bg: #1a1a1a;
+            --card-bg: #2c2c2c;
+            --text-light: #ecf0f1;
+            --text-muted: #bdc3c7;
+            --border-color: #444;
+            --success: #27ae60;
+            --warning: #e67e22;
+            --info: #3498db;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--dark-bg);
+            color: var(--text-light);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Header */
+        header {
+            background: rgba(26, 26, 26, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            border-bottom: 1px solid var(--border-color);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .header-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .logo {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--primary-green);
+            text-decoration: none;
+        }
+
+        .logo span {
+            color: var(--primary-yellow);
+        }
+
+        .nav-controls {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .dropbtn {
+            background: var(--card-bg);
+            color: var(--text-light);
+            padding: 0.7rem 1.2rem;
+            font-size: 0.95rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.3s;
+        }
+
+        .dropbtn:hover {
+            background: #3a3a3a;
+            border-color: var(--primary-green);
+        }
+
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            background-color: var(--card-bg);
+            min-width: 220px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.4);
+            z-index: 1;
+            border-radius: 6px;
+            overflow: hidden;
+            top: 100%;
+            left: 0;
+            margin-top: 0.5rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .dropdown-content a,
+        .dropdown-content label {
+            color: var(--text-light);
+            padding: 0.75rem 1rem;
+            text-decoration: none;
+            display: block;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .dropdown-content a:hover,
+        .dropdown-content label:hover {
+            background-color: #3a3a3a;
+        }
+
+        .dropdown-content input[type="checkbox"] {
+            margin-right: 0.75rem;
+        }
+
+        .dropdown:hover .dropdown-content {
+            display: block;
+        }
+
+        .action-btn {
+            background: var(--primary-green);
+            color: white;
+            border: none;
+            padding: 0.7rem 1.5rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .action-btn:hover {
+            background: #27ae60;
+            transform: translateY(-1px);
+        }
+
+        .action-btn.secondary {
+            background: transparent;
+            border: 1px solid var(--primary-yellow);
+            color: var(--primary-yellow);
+        }
+
+        .action-btn.secondary:hover {
+            background: rgba(241, 196, 15, 0.1);
+        }
+
+        /* Search */
+        .search-container {
+            position: relative;
+        }
+
+        .search-container input {
+            padding: 0.7rem 1rem 0.7rem 2.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--card-bg);
+            color: var(--text-light);
+            width: 250px;
+        }
+
+        .search-container i {
+            position: absolute;
+            left: 0.8rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+        }
+
+        /* Main Layout */
+        .main-container {
+            display: flex;
+            height: calc(100vh - 80px);
+            position: relative;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 380px;
+            background: var(--card-bg);
+            padding: 1.5rem;
+            overflow-y: auto;
+            border-right: 1px solid var(--border-color);
+            transition: transform 0.3s ease;
+            z-index: 900;
+        }
+
+        .sidebar.hidden {
+            transform: translateX(-100%);
+        }
+
+        .sidebar-toggle {
+            position: absolute;
+            left: 10px;
+            top: 10px;
+            background: var(--primary-green);
+            color: white;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            z-index: 901;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .stat-card {
+            background: #333;
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+            border-left: 4px solid var(--primary-green);
+        }
+
+        .stat-card h3 {
+            font-size: 2rem;
+            margin: 0.5rem 0;
+            color: var(--primary-yellow);
+        }
+
+        .stat-card p {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        .chart-container {
+            background: #333;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            position: relative;
+        }
+
+        .chart-title {
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+            color: var(--primary-green);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* Map Container */
+        .map-container {
+            flex: 1;
+            position: relative;
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
+        }
+
+        /* Basemap Selector */
+        .basemap-selector {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(26, 26, 26, 0.9);
+            padding: 1rem;
+            border-radius: 8px;
+            z-index: 800;
+            max-height: 70vh;
+            overflow-y: auto;
+            width: 200px;
+            border: 1px solid var(--border-color);
+        }
+
+        .basemap-item {
+            display: flex;
+            align-items: center;
+            padding: 0.6rem;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-bottom: 0.5rem;
+            transition: background 0.2s;
+            font-size: 0.9rem;
+        }
+
+        .basemap-item:hover {
+            background: #3a3a3a;
+        }
+
+        .basemap-item.active {
+            background: var(--primary-green);
+            color: white;
+        }
+
+        .basemap-thumb {
+            width: 40px;
+            height: 40px;
+            border-radius: 4px;
+            margin-right: 0.75rem;
+            background: #555;
+            background-size: cover;
+            background-position: center;
+            border: 1px solid var(--border-color);
+        }
+
+        /* Popups */
+        .custom-popup .leaflet-popup-content-wrapper {
+            background: var(--card-bg);
+            color: var(--text-light);
+            border-radius: 8px;
+            padding: 0;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+
+        .custom-popup .leaflet-popup-content {
+            margin: 0;
+            padding: 1rem;
+        }
+
+        .popup-header {
+            background: var(--primary-green);
+            color: white;
+            padding: 0.75rem 1rem;
+            margin: -1rem -1rem 1rem -1rem;
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .popup-body {
+            font-size: 0.95rem;
+        }
+
+        .popup-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.4rem 0;
+            border-bottom: 1px dashed var(--border-color);
+        }
+
+        .popup-row:last-child {
+            border-bottom: none;
+        }
+
+        .popup-label {
+            font-weight: 600;
+            color: var(--primary-yellow);
+        }
+
+        .signal-line {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin: 1rem 0;
+            padding: 0.75rem;
+            background: #333;
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }
+
+        .signal-line i {
+            font-size: 1.2rem;
+        }
+
+        .trend-up { color: var(--success); }
+        .trend-down { color: #e74c3c; }
+        .trend-flat { color: var(--text-muted); }
+
+        /* Analysis Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.8);
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background-color: var(--card-bg);
+            margin: 5% auto;
+            padding: 2rem;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 1100px;
+            max-height: 90vh;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .modal-title {
+            font-size: 1.5rem;
+            color: var(--primary-green);
+        }
+
+        .close {
+            color: var(--text-muted);
+            font-size: 2rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .close:hover {
+            color: #e74c3c;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-top: 1rem;
+        }
+
+        @media (max-width: 992px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .chart-wrapper {
+            background: #333;
+            padding: 1.5rem;
+            border-radius: 8px;
+        }
+
+        .chart-wrapper h3 {
+            margin-bottom: 1rem;
+            color: var(--primary-yellow);
+            font-size: 1.2rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .sidebar {
+                position: absolute;
+                height: 100%;
+                z-index: 900;
+            }
+            .map-container {
+                width: 100%;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header-container {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .nav-controls {
+                justify-content: center;
+            }
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            .search-container input {
+                width: 100%;
+            }
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #2c2c2c;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #555;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #777;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header>
+        <div class="header-container">
+            <a href="#" class="logo">Livability <span>Index</span></a>
+            <div class="nav-controls">
+                <div class="dropdown">
+                    <button class="dropbtn"><i class="fas fa-map-marker-alt"></i> All Counties <i class="fas fa-caret-down"></i></button>
+                    <div class="dropdown-content">
+                        <label><input type="checkbox" checked> Nairobi</label>
+                        <label><input type="checkbox" checked> Mombasa</label>
+                        <label><input type="checkbox" checked> Kisumu</label>
+                        <label><input type="checkbox" checked> Nakuru</label>
+                        <label><input type="checkbox"> Kiambu</label>
+                        <label><input type="checkbox"> Machakos</label>
+                    </div>
+                </div>
+
+                <div class="dropdown">
+                    <button class="dropbtn"><i class="fas fa-tasks"></i> Index Tiers <i class="fas fa-caret-down"></i></button>
+                    <div class="dropdown-content">
+                        <a href="#">Tier 1 (High)</a>
+                        <a href="#">Tier 2 (Medium)</a>
+                        <a href="#">Tier 3 (Low)</a>
+                        <a href="#">Tier 4 (Critical)</a>
+                    </div>
+                </div>
+
+                <div class="dropdown">
+                    <button class="dropbtn"><i class="fas fa-handshake"></i> Data Sources <i class="fas fa-caret-down"></i></button>
+                    <div class="dropdown-content">
+                        <label><input type="checkbox" checked> World Bank</label>
+                        <label><input type="checkbox" checked> UN-Habitat</label>
+                        <label><input type="checkbox"> Kenya NBS</label>
+                        <label><input type="checkbox"> Local Gov</label>
+                    </div>
+                </div>
+
+                <div class="dropdown">
+                    <button class="dropbtn"><i class="fas fa-calendar"></i> 2025 <i class="fas fa-caret-down"></i></button>
+                    <div class="dropdown-content">
+                        <a href="#">2025</a>
+                        <a href="#">2024</a>
+                        <a href="#">2023</a>
+                        <a href="#">2022</a>
+                    </div>
+                </div>
+
+                <div class="search-container">
+                    <i class="fas fa-search"></i>
+                    <input type="text" placeholder="Search projects, areas...">
+                </div>
+
+                <button class="action-btn" id="viewAllBtn"><i class="fas fa-eye"></i> View All</button>
+                <button class="action-btn secondary" id="statsBtn"><i class="fas fa-chart-bar"></i> Statistics</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Layout -->
+    <div class="main-container">
+        <!-- Sidebar -->
+        <button class="sidebar-toggle" id="sidebarToggle"><i class="fas fa-bars"></i></button>
+        <aside class="sidebar" id="sidebar">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>1,247</h3>
+                    <p>Total Projects</p>
+                </div>
+                <div class="stat-card">
+                    <h3>47</h3>
+                    <p>Counties</p>
+                </div>
+                <div class="stat-card">
+                    <h3>$2.8B</h3>
+                    <p>Total Value</p>
+                </div>
+                <div class="stat-card">
+                    <h3>68.4</h3>
+                    <p>Avg. Index</p>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <div class="chart-title"><i class="fas fa-tasks"></i> Status Overview</div>
+                <canvas id="statusChart"></canvas>
+            </div>
+
+            <div class="chart-container">
+                <div class="chart-title"><i class="fas fa-chart-pie"></i> Thematic Weighting</div>
+                <canvas id="weightingChart"></canvas>
+            </div>
+        </aside>
+
+        <!-- Map -->
+        <div class="map-container">
+            <div id="map"></div>
+
+            <!-- Basemap Selector -->
+            <div class="basemap-selector" id="basemapSelector">
+                <div class="basemap-item active" data-layer="dark">
+                    <div class="basemap-thumb" style="background-image: url('https://via.placeholder.com/40x40/333/666?text=DARK');"></div>
+                    <span>Dark Matter</span>
+                </div>
+                <div class="basemap-item" data-layer="light">
+                    <div class="basemap-thumb" style="background-image: url('https://via.placeholder.com/40x40/eee/ccc?text=LIGHT');"></div>
+                    <span>Light</span>
+                </div>
+                <div class="basemap-item" data-layer="streets">
+                    <div class="basemap-thumb" style="background-image: url('https://via.placeholder.com/40x40/fff/000?text=ST');"></div>
+                    <span>Streets</span>
+                </div>
+                <div class="basemap-item" data-layer="satellite">
+                    <div class="basemap-thumb" style="background-image: url('https://via.placeholder.com/40x40/456/789?text=SAT');"></div>
+                    <span>Satellite</span>
+                </div>
+                <div class="basemap-item" data-layer="sentinel">
+                    <div class="basemap-thumb" style="background-image: url('https://via.placeholder.com/40x40/234/567?text=S2');"></div>
+                    <span>Sentinel-2</span>
+                </div>
+                <div class="basemap-item" data-layer="terrain">
+                    <div class="basemap-thumb" style="background-image: url('https://via.placeholder.com/40x40/654/321?text=TER');"></div>
+                    <span>Terrain</span>
+                </div>
+                <div class="basemap-item" data-layer="topo">
+                    <div class="basemap-thumb" style="background-image: url('https://via.placeholder.com/40x40/789/456?text=TOPO');"></div>
+                    <span>Topographic</span>
+                </div>
+                <div class="basemap-item" data-layer="outdoors">
+                    <div class="basemap-thumb" style="background-image: url('https://via.placeholder.com/40x40/321/654?text=OUT');"></div>
+                    <span>Outdoors</span>
+                </div>
+                <div class="basemap-item" data-layer="gray">
+                    <div class="basemap-thumb" style="background-image: url('https://via.placeholder.com/40x40/999/ccc?text=GRAY');"></div>
+                    <span>Grayscale</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Analysis Modal -->
+    <div id="analysisModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title"><i class="fas fa-chart-line"></i> Livability Index Analysis</h2>
+                <span class="close">&times;</span>
+            </div>
+            <div class="charts-grid">
+                <div class="chart-wrapper">
+                    <h3>Index Components Status</h3>
+                    <canvas id="modalStatusChart"></canvas>
+                </div>
+                <div class="chart-wrapper">
+                    <h3>Thematic Area Weighting</h3>
+                    <canvas id="modalWeightingChart"></canvas>
+                </div>
+                <div class="chart-wrapper">
+                    <h3>Score vs. Population Density</h3>
+                    <canvas id="scatterChart"></canvas>
+                </div>
+                <div class="chart-wrapper">
+                    <h3>Export Options</h3>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+                        <button class="action-btn" style="width: 100%;"><i class="fas fa-file-excel"></i> Export CSV</button>
+                        <button class="action-btn secondary" style="width: 100%;"><i class="fas fa-file-pdf"></i> Export PDF</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+
+    <script>
+        // Initialize Map
+        const map = L.map('map').setView([-1.2921, 36.8219], 6);
+
+        // Basemap Layers
+        const basemaps = {
+            dark: L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; Stadia Maps'
+            }),
+            light: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap'
+            }),
+            streets: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+                attribution: 'Esri'
+            }),
+            satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                attribution: 'Esri'
+            }),
+            sentinel: L.tileLayer('https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless_3857/default/g/{z}/{y}/{x}.jpg', {
+                attribution: 'Sentinel-2 cloudless'
+            }),
+            terrain: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Terrain_Base/MapServer/tile/{z}/{y}/{x}', {
+                attribution: 'Esri'
+            }),
+            topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+                attribution: 'OpenTopoMap'
+            }),
+            outdoors: L.tileLayer('https://tiles.stadiamaps.com/tiles/outdoors/{z}/{x}/{y}{r}.png', {
+                attribution: 'Stadia Maps'
+            }),
+            gray: L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png', {
+                attribution: 'Stadia Maps'
+            })
+        };
+
+        // Add default basemap
+        basemaps.dark.addTo(map);
+
+        // Basemap Selector
+        document.querySelectorAll('.basemap-item').forEach(item => {
+            item.addEventListener('click', function() {
+                const layerKey = this.getAttribute('data-layer');
+                map.eachLayer(layer => map.removeLayer(layer));
+                basemaps[layerKey].addTo(map);
+
+                document.querySelectorAll('.basemap-item').forEach(i => i.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+
+        // Marker Cluster Group
+        const markers = L.markerClusterGroup({
+            spiderfyOnMaxZoom: true,
+            showCoverageOnHover: false,
+            zoomToBoundsOnClick: true,
+            maxClusterRadius: 50
+        });
+
+        // Sample Data
+        const projectData = [
+            { lat: -1.2921, lng: 36.8219, name: "Nairobi Water Project", status: "Ongoing", funder: "World Bank", county: "Nairobi", cost: "$45M", theme: "Water", beneficiaries: "2.1M", desc: "Upgrading water supply network...", impact: "+28% access" },
+            { lat: -4.0435, lng: 39.6682, name: "Mombasa Port Health", status: "Completed", funder: "UN-Habitat", county: "Mombasa", cost: "$32M", theme: "Health", beneficiaries: "1.4M", desc: "Hospital expansion and equipment...", impact: "+42% capacity" },
+            { lat: -0.0917, lng: 34.7680, name: "Kisumu Education Hub", status: "Awarding", funder: "Kenya Gov", county: "Kisumu", cost: "$18M", theme: "Education", beneficiaries: "450K", desc: "New technical colleges...", impact: "Projected +35% enrollment" },
+            { lat: -0.3031, lng: 36.0800, name: "Nakuru Renewable Energy", status: "Ongoing", funder: "EU", county: "Nakuru", cost: "$28M", theme: "Energy", beneficiaries: "890K", desc: "Solar mini-grids...", impact: "+55% clean energy" },
+            { lat: -1.0333, lng: 37.0833, name: "Machakos Smart City", status: "Planning", funder: "AfDB", county: "Machakos", cost: "$120M", theme: "Infrastructure", beneficiaries: "3.2M", desc: "Digital governance platform...", impact: "TBD" }
+        ];
+
+        // Add Markers
+        projectData.forEach(project => {
+            const iconColor = project.status === "Completed" ? "#27ae60" :
+                             project.status === "Ongoing" ? "#f1c40f" :
+                             project.status === "Awarding" ? "#3498db" : "#95a5a6";
+
+            const customIcon = L.divIcon({
+                html: `<div style="background:${iconColor}; width:14px; height:14px; border-radius:50%; border:3px solid white; box-shadow:0 2px 6px rgba(0,0,0,0.4);"></div>`,
+                iconSize: [20, 20],
+                className: 'custom-div-icon'
+            });
+
+            const marker = L.marker([project.lat, project.lng], { icon: customIcon });
+            
+            const trendClass = project.impact.includes("+") ? "trend-up" : 
+                              project.impact.includes("-") ? "trend-down" : "trend-flat";
+            const trendIcon = project.impact.includes("+") ? "fa-arrow-up" :
+                             project.impact.includes("-") ? "fa-arrow-down" : "fa-minus";
+
+            marker.bindPopup(`
+                <div class="custom-popup">
+                    <div class="popup-header">${project.name}</div>
+                    <div class="popup-body">
+                        <div class="popup-row"><span class="popup-label">Status:</span> <span>${project.status}</span></div>
+                        <div class="popup-row"><span class="popup-label">Funder:</span> <span>${project.funder}</span></div>
+                        <div class="popup-row"><span class="popup-label">County:</span> <span>${project.county}</span></div>
+                        <div class="popup-row"><span class="popup-label">Cost:</span> <span>${project.cost}</span></div>
+                        <div class="popup-row"><span class="popup-label">Theme:</span> <span>${project.theme}</span></div>
+                        <div class="popup-row"><span class="popup-label">Beneficiaries:</span> <span>${project.beneficiaries}</span></div>
+                        <div style="margin:1rem 0; font-size:0.9rem; color:var(--text-muted);">${project.desc}</div>
+                        <div class="signal-line ${trendClass}">
+                            <i class="fas ${trendIcon}"></i>
+                            <div>
+                                <strong>Impact Signal:</strong><br>
+                                <span style="font-size:0.9rem;">${project.impact}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `, {
+                maxWidth: 320,
+                className: 'custom-popup'
+            });
+
+            markers.addLayer(marker);
+        });
+
+        map.addLayer(markers);
+
+        // Charts
+        const statusCtx = document.getElementById('statusChart').getContext('2d');
+        new Chart(statusCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Awarding', 'Ongoing', 'Completed', 'Planning'],
+                datasets: [{
+                    label: 'Projects',
+                    data: [89, 312, 428, 418],
+                    backgroundColor: ['#3498db', '#f1c40f', '#27ae60', '#95a5a6'],
+                    borderWidth: 0,
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, grid: { color: '#444' }, ticks: { color: '#aaa' } },
+                    x: { grid: { display: false }, ticks: { color: '#aaa' } }
+                }
+            }
+        });
+
+        const weightingCtx = document.getElementById('weightingChart').getContext('2d');
+        new Chart(weightingCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Health', 'Education', 'Water', 'Energy', 'Transport', 'Housing'],
+                datasets: [{
+                    data: [25, 20, 18, 15, 12, 10],
+                    backgroundColor: ['#e74c3c', '#9b59b6', '#3498db', '#f1c40f', '#2ecc71', '#e67e22'],
+                    borderWidth: 0,
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { position: 'bottom', labels: { color: '#aaa' } } }
+            }
+        });
+
+        // Modal Charts
+        let modalStatusChart, modalWeightingChart, scatterChart;
+
+        // Modal
+        const modal = document.getElementById('analysisModal');
+        const statsBtn = document.getElementById('statsBtn');
+        const closeBtn = document.getElementsByClassName('close')[0];
+
+        statsBtn.onclick = function() {
+            modal.style.display = 'block';
+            if (!modalStatusChart) initModalCharts();
+        }
+
+        closeBtn.onclick = function() {
+            modal.style.display = 'none';
+        }
+
+        window.onclick = function(event) {
+            if (event.target == modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        function initModalCharts() {
+            // Status Bar
+            const mStatusCtx = document.getElementById('modalStatusChart').getContext('2d');
+            modalStatusChart = new Chart(mStatusCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Awarding Stage', 'Ongoing', 'Completed', 'Planning'],
+                    datasets: [{
+                        label: 'Number of Components',
+                        data: [89, 312, 428, 418],
+                        backgroundColor: ['#3498db', '#f1c40f', '#27ae60', '#95a5a6']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+
+            // Weighting Donut
+            const mWeightCtx = document.getElementById('modalWeightingChart').getContext('2d');
+            modalWeightingChart = new Chart(mWeightCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Health', 'Education', 'Water', 'Energy', 'Transport', 'Housing'],
+                    datasets: [{
+                        data: [25, 20, 18, 15, 12, 10],
+                        backgroundColor: ['#e74c3c', '#9b59b6', '#3498db', '#f1c40f', '#2ecc71', '#e67e22']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+
+            // Scatter Plot
+            const scatterCtx = document.getElementById('scatterChart').getContext('2d');
+            scatterChart = new Chart(scatterCtx, {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'Counties',
+                        data: [
+                            {x: 120, y: 78}, {x: 89, y: 65}, {x: 210, y: 82}, {x: 45, y: 52},
+                            {x: 310, y: 88}, {x: 67, y: 59}, {x: 98, y: 71}, {x: 156, y: 74},
+                            {x: 234, y: 79}, {x: 178, y: 68}
+                        ],
+                        backgroundColor: 'rgba(46, 204, 113, 0.8)',
+                        borderColor: '#27ae60',
+                        pointRadius: 7
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: { title: { display: true, text: 'Population Density (per km²)', color: '#aaa' }, grid: { color: '#444' }, ticks: { color: '#aaa' } },
+                        y: { title: { display: true, text: 'Livability Index Score', color: '#aaa' }, grid: { color: '#444' }, ticks: { color: '#aaa' }, min: 40, max: 100 }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `Density: ${context.parsed.x}/km², Score: ${context.parsed.y}`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Sidebar Toggle
+        const sidebar = document.getElementById('sidebar');
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        sidebarToggle.addEventListener('click', () => {
+            sidebar.classList.toggle('hidden');
+            sidebarToggle.innerHTML = sidebar.classList.contains('hidden') ? 
+                '<i class="fas fa-chevron-right"></i>' : '<i class="fas fa-chevron-left"></i>';
+        });
+
+        // Fit map to markers on load
+        setTimeout(() => {
+            if (markers.getLayers().length > 0) {
+                map.fitBounds(markers.getBounds().pad(0.1));
+            }
+        }, 500);
+    </script>
+</body>
+</html>
