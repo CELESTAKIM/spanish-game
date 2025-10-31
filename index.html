@@ -1,0 +1,911 @@
+<!doctype html>
+<html lang="en">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spanish Fruit Vocabulary Game</title>
+  <script src="/_sdk/data_sdk.js"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <style>
+    body {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Comic Sans MS', cursive, sans-serif;
+      background: linear-gradient(135deg, #ff6b6b 0%, #feca57 50%, #48dbfb 100%);
+      color: #2c3e50;
+      height: 100%;
+      overflow: hidden;
+      position: relative;
+    }
+
+    html {
+      height: 100%;
+    }
+
+    /* Animated background elements */
+    body::before {
+      content: '🍎 🍌 🍊 🍇 🍓 🥝 🍑 🍒 🥭 🍍';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 200%;
+      height: 100%;
+      font-size: 2em;
+      opacity: 0.1;
+      animation: float 20s linear infinite;
+      pointer-events: none;
+      z-index: 0;
+      display: flex;
+      align-items: center;
+      gap: 50px;
+    }
+
+    @keyframes float {
+      from { transform: translateX(-100%); }
+      to { transform: translateX(0%); }
+    }
+
+    .game-container {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      z-index: 1;
+    }
+
+    .header {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      padding: 20px;
+      text-align: center;
+      border-bottom: 3px solid #e74c3c;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    .header h1 {
+      margin: 0 0 10px 0;
+      font-size: 2.5em;
+      font-weight: bold;
+      background: linear-gradient(135deg, #e74c3c 0%, #f39c12 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .header p {
+      margin: 0 0 15px 0;
+      font-size: 1.2em;
+      color: #34495e;
+      font-weight: 600;
+    }
+
+    .teacher-info {
+      font-size: 1em;
+      color: #7f8c8d;
+      font-style: italic;
+    }
+
+    .student-setup {
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 15px;
+      padding: 25px;
+      margin: 20px;
+      text-align: center;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    }
+
+    .student-input {
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .student-input input {
+      padding: 12px 20px;
+      border: 3px solid #3498db;
+      border-radius: 25px;
+      font-size: 1.1em;
+      font-family: inherit;
+      outline: none;
+      transition: all 0.3s ease;
+      min-width: 200px;
+    }
+
+    .student-input input:focus {
+      border-color: #e74c3c;
+      box-shadow: 0 0 15px rgba(231, 76, 60, 0.3);
+      transform: scale(1.05);
+    }
+
+    .start-btn {
+      background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+      color: white;
+      border: none;
+      padding: 12px 30px;
+      border-radius: 25px;
+      font-size: 1.1em;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(46, 204, 113, 0.3);
+    }
+
+    .start-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(46, 204, 113, 0.4);
+    }
+
+    .start-btn:disabled {
+      background: #bdc3c7;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .game-area {
+      flex: 1;
+      display: flex;
+      position: relative;
+      padding: 20px;
+      gap: 20px;
+    }
+
+    .answer-zone {
+      width: 200px;
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 20px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border: 3px dashed #bdc3c7;
+      transition: all 0.3s ease;
+      position: relative;
+    }
+
+    .answer-zone.left {
+      border-color: #e74c3c;
+      background: rgba(231, 76, 60, 0.1);
+    }
+
+    .answer-zone.right {
+      border-color: #2ecc71;
+      background: rgba(46, 204, 113, 0.1);
+    }
+
+    .answer-zone.drag-over {
+      border-color: #f39c12;
+      background: rgba(243, 156, 18, 0.2);
+      transform: scale(1.05);
+      box-shadow: 0 8px 25px rgba(243, 156, 18, 0.3);
+    }
+
+    .zone-label {
+      font-size: 1.5em;
+      font-weight: bold;
+      margin-bottom: 15px;
+      text-align: center;
+    }
+
+    .spanish-word {
+      font-size: 2em;
+      font-weight: bold;
+      color: #2c3e50;
+      text-align: center;
+      padding: 15px;
+      background: rgba(255, 255, 255, 0.8);
+      border-radius: 15px;
+      margin-bottom: 10px;
+      border: 2px solid #3498db;
+    }
+
+    .card-area {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+    }
+
+    .fruit-card {
+      width: 300px;
+      height: 400px;
+      background: white;
+      border-radius: 25px;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: grab;
+      transition: all 0.3s ease;
+      border: 4px solid #3498db;
+      position: relative;
+      user-select: none;
+    }
+
+    .fruit-card:hover {
+      transform: translateY(-10px) rotate(2deg);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    }
+
+    .fruit-card.dragging {
+      cursor: grabbing;
+      transform: rotate(5deg) scale(1.1);
+      z-index: 1000;
+      opacity: 0.9;
+    }
+
+    .fruit-emoji {
+      font-size: 8em;
+      margin-bottom: 20px;
+      animation: bounce 2s ease-in-out infinite;
+    }
+
+    @keyframes bounce {
+      0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+      40% { transform: translateY(-10px); }
+      60% { transform: translateY(-5px); }
+    }
+
+    .fruit-name {
+      font-size: 2.5em;
+      font-weight: bold;
+      color: #2c3e50;
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    .drag-hint {
+      font-size: 1.2em;
+      color: #7f8c8d;
+      text-align: center;
+      font-style: italic;
+    }
+
+    .score-panel {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 15px;
+      padding: 20px;
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+      text-align: center;
+      min-width: 150px;
+    }
+
+    .score-item {
+      margin-bottom: 10px;
+      font-size: 1.1em;
+      font-weight: bold;
+    }
+
+    .score-correct {
+      color: #27ae60;
+    }
+
+    .score-incorrect {
+      color: #e74c3c;
+    }
+
+    .feedback {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      border-radius: 20px;
+      padding: 30px;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+      text-align: center;
+      z-index: 2000;
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(0.8);
+      transition: all 0.3s ease;
+    }
+
+    .feedback.show {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+
+    .feedback.correct {
+      border: 4px solid #27ae60;
+      background: linear-gradient(135deg, #d5f4e6 0%, #ffffff 100%);
+    }
+
+    .feedback.incorrect {
+      border: 4px solid #e74c3c;
+      background: linear-gradient(135deg, #ffeaa7 0%, #ffffff 100%);
+    }
+
+    .feedback-emoji {
+      font-size: 4em;
+      margin-bottom: 15px;
+    }
+
+    .feedback-text {
+      font-size: 1.5em;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+
+    .feedback-detail {
+      font-size: 1.1em;
+      color: #7f8c8d;
+    }
+
+    .next-btn {
+      background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+      color: white;
+      border: none;
+      padding: 12px 25px;
+      border-radius: 20px;
+      font-size: 1.1em;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 15px;
+      transition: all 0.3s ease;
+    }
+
+    .next-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
+    }
+
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s ease-in-out infinite;
+      margin-left: 10px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .game-complete {
+      text-align: center;
+      padding: 40px;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 25px;
+      margin: 20px;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+    }
+
+    .final-score {
+      font-size: 3em;
+      font-weight: bold;
+      margin-bottom: 20px;
+      background: linear-gradient(135deg, #f39c12 0%, #e74c3c 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .restart-btn {
+      background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);
+      color: white;
+      border: none;
+      padding: 15px 30px;
+      border-radius: 25px;
+      font-size: 1.2em;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 6px 20px rgba(155, 89, 182, 0.3);
+    }
+
+    .restart-btn:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 25px rgba(155, 89, 182, 0.4);
+    }
+
+    @media (max-width: 768px) {
+      .game-area {
+        flex-direction: column;
+        padding: 10px;
+      }
+      
+      .answer-zone {
+        width: 100%;
+        height: 80px;
+        flex-direction: row;
+        justify-content: space-around;
+      }
+      
+      .fruit-card {
+        width: 250px;
+        height: 320px;
+      }
+      
+      .fruit-emoji {
+        font-size: 5em;
+      }
+      
+      .fruit-name {
+        font-size: 2em;
+      }
+      
+      .score-panel {
+        position: relative;
+        margin: 10px;
+      }
+    }
+  </style>
+  <style>@view-transition { navigation: auto; }</style>
+  <script src="https://cdn.tailwindcss.com" type="text/javascript"></script>
+ </head>
+ <body>
+  <div class="game-container">
+   <div class="header">
+    <h1 id="game-title">Spanish Fruit Vocabulary Game</h1>
+    <p id="instructions">Drag the fruit card to match it with the correct Spanish word!</p>
+    <div class="teacher-info" id="teacher-name">
+     Teacher: Señora García
+    </div>
+   </div>
+   <div class="student-setup" id="student-setup">
+    <h2>¡Bienvenidos! Welcome Students!</h2>
+    <div class="student-input"><input type="text" id="student-name-input" placeholder="Enter your name" maxlength="50"> <button class="start-btn" id="start-game-btn">Start Game 🎮</button>
+    </div>
+   </div>
+   <div class="game-area" id="game-area" style="display: none;">
+    <div class="answer-zone left" id="left-zone">
+     <div class="zone-label">
+      Drag Here ⬅️
+     </div>
+     <div class="spanish-word" id="left-spanish"></div>
+    </div>
+    <div class="card-area">
+     <div class="fruit-card" id="fruit-card" draggable="true">
+      <div class="fruit-emoji" id="fruit-emoji">
+       🍎
+      </div>
+      <div class="fruit-name" id="fruit-name">
+       Apple
+      </div>
+      <div class="drag-hint">
+       Drag left or right!
+      </div>
+     </div>
+    </div>
+    <div class="answer-zone right" id="right-zone">
+     <div class="zone-label">
+      Drag Here ➡️
+     </div>
+     <div class="spanish-word" id="right-spanish"></div>
+    </div>
+    <div class="score-panel">
+     <div class="score-item">
+      Score: <span id="current-score">0</span>
+     </div>
+     <div class="score-item score-correct">
+      Correct: <span id="correct-count">0</span>
+     </div>
+     <div class="score-item score-incorrect">
+      Wrong: <span id="incorrect-count">0</span>
+     </div>
+     <div class="score-item">
+      Card: <span id="card-number">1</span>/10
+     </div>
+    </div>
+   </div>
+   <div class="feedback" id="feedback">
+    <div class="feedback-emoji" id="feedback-emoji">
+     🎉
+    </div>
+    <div class="feedback-text" id="feedback-text">
+     ¡Correcto!
+    </div>
+    <div class="feedback-detail" id="feedback-detail">
+     Apple = Manzana
+    </div><button class="next-btn" id="next-btn">Next Card ➡️</button>
+   </div>
+   <div class="game-complete" id="game-complete" style="display: none;">
+    <h2>¡Juego Terminado! Game Complete!</h2>
+    <div class="final-score" id="final-score">
+     8/10
+    </div>
+    <p>Great job learning Spanish fruit vocabulary!</p><button class="restart-btn" id="restart-btn">Play Again 🔄</button>
+   </div>
+  </div>
+  <script>
+    const defaultConfig = {
+      game_title: "Spanish Fruit Vocabulary Game",
+      instructions: "Drag the fruit card to match it with the correct Spanish word!",
+      teacher_name: "Teacher: Señora García",
+      background_color: "#ff6b6b",
+      surface_color: "#ffffff",
+      text_color: "#2c3e50",
+      primary_action_color: "#3498db",
+      secondary_action_color: "#e74c3c",
+      font_family: "Comic Sans MS",
+      font_size: 16
+    };
+
+    let currentStudent = '';
+    let currentCard = 0;
+    let score = 0;
+    let correctCount = 0;
+    let incorrectCount = 0;
+    let startTime = 0;
+    let gameData = [];
+    let isLoading = false;
+
+    const fruits = [
+      { english: 'Apple', spanish: 'Manzana', emoji: '🍎' },
+      { english: 'Banana', spanish: 'Plátano', emoji: '🍌' },
+      { english: 'Orange', spanish: 'Naranja', emoji: '🍊' },
+      { english: 'Grapes', spanish: 'Uvas', emoji: '🍇' },
+      { english: 'Strawberry', spanish: 'Fresa', emoji: '🍓' },
+      { english: 'Kiwi', spanish: 'Kiwi', emoji: '🥝' },
+      { english: 'Cherry', spanish: 'Cereza', emoji: '🍒' },
+      { english: 'Mango', spanish: 'Mango', emoji: '🥭' },
+      { english: 'Pineapple', spanish: 'Piña', emoji: '🍍' },
+      { english: 'Peach', spanish: 'Durazno', emoji: '🍑' }
+    ];
+
+    let shuffledFruits = [];
+    let currentFruit = null;
+    let correctAnswer = '';
+
+    const dataHandler = {
+      onDataChanged(data) {
+        gameData = data;
+        console.log(`Stored ${data.length} game responses`);
+      }
+    };
+
+    async function initGame() {
+      if (window.dataSdk) {
+        const initResult = await window.dataSdk.init(dataHandler);
+        if (!initResult.isOk) {
+          console.error('Failed to initialize data SDK');
+        }
+      }
+
+      setupEventListeners();
+    }
+
+    function setupEventListeners() {
+      document.getElementById('start-game-btn').addEventListener('click', startGame);
+      document.getElementById('next-btn').addEventListener('click', nextCard);
+      document.getElementById('restart-btn').addEventListener('click', restartGame);
+
+      const fruitCard = document.getElementById('fruit-card');
+      const leftZone = document.getElementById('left-zone');
+      const rightZone = document.getElementById('right-zone');
+
+      // Drag and drop events
+      fruitCard.addEventListener('dragstart', handleDragStart);
+      fruitCard.addEventListener('dragend', handleDragEnd);
+
+      leftZone.addEventListener('dragover', handleDragOver);
+      leftZone.addEventListener('drop', (e) => handleDrop(e, 'left'));
+      leftZone.addEventListener('dragenter', handleDragEnter);
+      leftZone.addEventListener('dragleave', handleDragLeave);
+
+      rightZone.addEventListener('dragover', handleDragOver);
+      rightZone.addEventListener('drop', (e) => handleDrop(e, 'right'));
+      rightZone.addEventListener('dragenter', handleDragEnter);
+      rightZone.addEventListener('dragleave', handleDragLeave);
+
+      // Touch events for mobile
+      fruitCard.addEventListener('touchstart', handleTouchStart, { passive: false });
+      fruitCard.addEventListener('touchmove', handleTouchMove, { passive: false });
+      fruitCard.addEventListener('touchend', handleTouchEnd, { passive: false });
+    }
+
+    function startGame() {
+      const nameInput = document.getElementById('student-name-input');
+      const studentName = nameInput.value.trim();
+
+      if (!studentName) {
+        nameInput.style.borderColor = '#e74c3c';
+        nameInput.placeholder = 'Please enter your name!';
+        return;
+      }
+
+      currentStudent = studentName;
+      document.getElementById('student-setup').style.display = 'none';
+      document.getElementById('game-area').style.display = 'flex';
+
+      // Shuffle fruits for random order
+      shuffledFruits = [...fruits].sort(() => Math.random() - 0.5);
+      currentCard = 0;
+      score = 0;
+      correctCount = 0;
+      incorrectCount = 0;
+
+      loadNextCard();
+    }
+
+    function loadNextCard() {
+      if (currentCard >= shuffledFruits.length) {
+        endGame();
+        return;
+      }
+
+      currentFruit = shuffledFruits[currentCard];
+      
+      // Randomly decide if correct answer is on left or right
+      const correctSide = Math.random() < 0.5 ? 'left' : 'right';
+      correctAnswer = correctSide;
+
+      // Get a random wrong answer
+      const wrongAnswers = fruits.filter(f => f.spanish !== currentFruit.spanish);
+      const wrongAnswer = wrongAnswers[Math.floor(Math.random() * wrongAnswers.length)];
+
+      // Set up the card
+      document.getElementById('fruit-emoji').textContent = currentFruit.emoji;
+      document.getElementById('fruit-name').textContent = currentFruit.english;
+
+      // Set up answer zones
+      if (correctSide === 'left') {
+        document.getElementById('left-spanish').textContent = currentFruit.spanish;
+        document.getElementById('right-spanish').textContent = wrongAnswer.spanish;
+      } else {
+        document.getElementById('left-spanish').textContent = wrongAnswer.spanish;
+        document.getElementById('right-spanish').textContent = currentFruit.spanish;
+      }
+
+      // Update UI
+      document.getElementById('card-number').textContent = currentCard + 1;
+      document.getElementById('current-score').textContent = score;
+      document.getElementById('correct-count').textContent = correctCount;
+      document.getElementById('incorrect-count').textContent = incorrectCount;
+
+      startTime = Date.now();
+    }
+
+    function handleDragStart(e) {
+      e.target.classList.add('dragging');
+    }
+
+    function handleDragEnd(e) {
+      e.target.classList.remove('dragging');
+    }
+
+    function handleDragOver(e) {
+      e.preventDefault();
+    }
+
+    function handleDragEnter(e) {
+      e.target.classList.add('drag-over');
+    }
+
+    function handleDragLeave(e) {
+      e.target.classList.remove('drag-over');
+    }
+
+    async function handleDrop(e, side) {
+      e.preventDefault();
+      e.target.classList.remove('drag-over');
+
+      const responseTime = Date.now() - startTime;
+      const isCorrect = side === correctAnswer;
+      const studentAnswer = side === 'left' ? 
+        document.getElementById('left-spanish').textContent : 
+        document.getElementById('right-spanish').textContent;
+
+      await processAnswer(studentAnswer, isCorrect, responseTime);
+    }
+
+    // Touch events for mobile support
+    let touchStartX = 0;
+    let touchStartY = 0;
+
+    function handleTouchStart(e) {
+      const touch = e.touches[0];
+      touchStartX = touch.clientX;
+      touchStartY = touch.clientY;
+    }
+
+    function handleTouchMove(e) {
+      e.preventDefault();
+    }
+
+    async function handleTouchEnd(e) {
+      const touch = e.changedTouches[0];
+      const touchEndX = touch.clientX;
+      const deltaX = touchEndX - touchStartX;
+
+      if (Math.abs(deltaX) > 100) { // Minimum swipe distance
+        const side = deltaX < 0 ? 'left' : 'right';
+        const responseTime = Date.now() - startTime;
+        const isCorrect = side === correctAnswer;
+        const studentAnswer = side === 'left' ? 
+          document.getElementById('left-spanish').textContent : 
+          document.getElementById('right-spanish').textContent;
+
+        await processAnswer(studentAnswer, isCorrect, responseTime);
+      }
+    }
+
+    async function processAnswer(studentAnswer, isCorrect, responseTime) {
+      if (isLoading) return;
+      isLoading = true;
+
+      // Update score
+      if (isCorrect) {
+        score += 10;
+        correctCount++;
+      } else {
+        incorrectCount++;
+      }
+
+      // Save response to Canva Sheet
+      if (window.dataSdk) {
+        const loadingBtn = document.getElementById('next-btn');
+        const originalText = loadingBtn.textContent;
+        loadingBtn.innerHTML = 'Saving... <span class="loading"></span>';
+        loadingBtn.disabled = true;
+
+        const response = {
+          student_name: currentStudent,
+          fruit_english: currentFruit.english,
+          fruit_spanish: currentFruit.spanish,
+          student_answer: studentAnswer,
+          is_correct: isCorrect,
+          timestamp: new Date().toISOString(),
+          response_time_ms: responseTime
+        };
+
+        const result = await window.dataSdk.create(response);
+        
+        loadingBtn.textContent = originalText;
+        loadingBtn.disabled = false;
+
+        if (!result.isOk) {
+          console.error('Failed to save response:', result.error);
+        }
+      }
+
+      // Show feedback
+      showFeedback(isCorrect, studentAnswer);
+      isLoading = false;
+    }
+
+    function showFeedback(isCorrect, studentAnswer) {
+      const feedback = document.getElementById('feedback');
+      const emoji = document.getElementById('feedback-emoji');
+      const text = document.getElementById('feedback-text');
+      const detail = document.getElementById('feedback-detail');
+
+      feedback.className = 'feedback show ' + (isCorrect ? 'correct' : 'incorrect');
+
+      if (isCorrect) {
+        emoji.textContent = '🎉';
+        text.textContent = '¡Correcto! Correct!';
+        detail.textContent = `${currentFruit.english} = ${currentFruit.spanish}`;
+      } else {
+        emoji.textContent = '😅';
+        text.textContent = '¡Inténtalo de nuevo! Try again!';
+        detail.textContent = `${currentFruit.english} = ${currentFruit.spanish} (You chose: ${studentAnswer})`;
+      }
+    }
+
+    function nextCard() {
+      document.getElementById('feedback').classList.remove('show');
+      currentCard++;
+      setTimeout(loadNextCard, 300);
+    }
+
+    function endGame() {
+      document.getElementById('game-area').style.display = 'none';
+      document.getElementById('game-complete').style.display = 'block';
+      document.getElementById('final-score').textContent = `${correctCount}/${shuffledFruits.length}`;
+    }
+
+    function restartGame() {
+      document.getElementById('game-complete').style.display = 'none';
+      document.getElementById('student-setup').style.display = 'block';
+      document.getElementById('student-name-input').value = '';
+      document.getElementById('feedback').classList.remove('show');
+    }
+
+    async function onConfigChange(config) {
+      const gameTitle = config.game_title || defaultConfig.game_title;
+      const instructions = config.instructions || defaultConfig.instructions;
+      const teacherName = config.teacher_name || defaultConfig.teacher_name;
+      const backgroundColor = config.background_color || defaultConfig.background_color;
+      const surfaceColor = config.surface_color || defaultConfig.surface_color;
+      const textColor = config.text_color || defaultConfig.text_color;
+      const primaryActionColor = config.primary_action_color || defaultConfig.primary_action_color;
+      const secondaryActionColor = config.secondary_action_color || defaultConfig.secondary_action_color;
+      const fontFamily = config.font_family || defaultConfig.font_family;
+      const fontSize = config.font_size || defaultConfig.font_size;
+
+      document.getElementById('game-title').textContent = gameTitle;
+      document.getElementById('instructions').textContent = instructions;
+      document.getElementById('teacher-name').textContent = teacherName;
+
+      document.body.style.background = `linear-gradient(135deg, ${backgroundColor} 0%, ${primaryActionColor} 50%, ${secondaryActionColor} 100%)`;
+      document.body.style.color = textColor;
+
+      document.body.style.fontFamily = `${fontFamily}, cursive, sans-serif`;
+      document.querySelector('.header h1').style.fontSize = `${fontSize * 2.5}px`;
+      document.querySelector('.header p').style.fontSize = `${fontSize * 1.2}px`;
+    }
+
+    if (window.elementSdk) {
+      window.elementSdk.init({
+        defaultConfig,
+        onConfigChange,
+        mapToCapabilities: (config) => ({
+          recolorables: [
+            {
+              get: () => config.background_color || defaultConfig.background_color,
+              set: (value) => {
+                config.background_color = value;
+                window.elementSdk.setConfig({ background_color: value });
+              }
+            },
+            {
+              get: () => config.surface_color || defaultConfig.surface_color,
+              set: (value) => {
+                config.surface_color = value;
+                window.elementSdk.setConfig({ surface_color: value });
+              }
+            },
+            {
+              get: () => config.text_color || defaultConfig.text_color,
+              set: (value) => {
+                config.text_color = value;
+                window.elementSdk.setConfig({ text_color: value });
+              }
+            },
+            {
+              get: () => config.primary_action_color || defaultConfig.primary_action_color,
+              set: (value) => {
+                config.primary_action_color = value;
+                window.elementSdk.setConfig({ primary_action_color: value });
+              }
+            },
+            {
+              get: () => config.secondary_action_color || defaultConfig.secondary_action_color,
+              set: (value) => {
+                config.secondary_action_color = value;
+                window.elementSdk.setConfig({ secondary_action_color: value });
+              }
+            }
+          ],
+          borderables: [],
+          fontEditable: {
+            get: () => config.font_family || defaultConfig.font_family,
+            set: (value) => {
+              config.font_family = value;
+              window.elementSdk.setConfig({ font_family: value });
+            }
+          },
+          fontSizeable: {
+            get: () => config.font_size || defaultConfig.font_size,
+            set: (value) => {
+              config.font_size = value;
+              window.elementSdk.setConfig({ font_size: value });
+            }
+          }
+        }),
+        mapToEditPanelValues: (config) => new Map([
+          ["game_title", config.game_title || defaultConfig.game_title],
+          ["instructions", config.instructions || defaultConfig.instructions],
+          ["teacher_name", config.teacher_name || defaultConfig.teacher_name]
+        ])
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', initGame);
+  </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'996de214052370b6',t:'MTc2MTg1ODQ1NS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
