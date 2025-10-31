@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Livability Index - Data Dashboard</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css" />
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
+    <style>
+        /* ---------------------------------- */
+        /* 4. OVERALL STYLING AND TONE (CSS) */
+        /* ---------------------------------- */
+        :root {
+            --color-dark-bg: #1e1e2f;
+            --color-card-bg: #27293d;
+            --color-text-light: #f0f0f0;
+            --color-accent-green: #4CAF50; /* Primary Accent */
+            --color-accent-yellow: #FFC107; /* Secondary Accent */
+            --color-accent-teal: #03A9F4;
+            --color-border: #353855;
+            --header-height: 60px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Roboto', sans-serif;
+        }
+
+        body.theme-dark {
+            background-color: var(--color-dark-bg);
+            color: var(--color-text-light);
+            overflow: hidden; /* Prevent body scroll due to map/modal */
+        }
+        
+        /* ---------------------------------- */
+        /* 3. HEADER & NAVIGATION (CSS) */
+        /* ---------------------------------- */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: var(--header-height);
+            padding: 0 20px;
+            background-color: var(--color-card-bg);
+            border-bottom: 1px solid var(--color-border);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+        }
+        .header__logo h1 {
+            font-size: 1.5em;
+            color: var(--color-accent-teal);
+            margin-left: 10px;
+            display: inline;
+        }
+        .header__logo i {
+            color: var(--color-accent-green);
+        }
+        
+        /* Dropdowns */
+        .header__nav, .header__actions {
+            display: flex;
+            align-items: center;
+        }
+        .header__dropdown {
+            position: relative;
+            margin-right: 15px;
+        }
+        .header__dropdown-btn, .btn {
+            background-color: var(--color-dark-bg);
+            color: var(--color-text-light);
+            border: 1px solid var(--color-border);
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .header__dropdown-btn:hover, .btn:hover {
+            border-color: var(--color-accent-teal);
+        }
+        .header__dropdown-content {
+            display: none;
+            position: absolute;
+            background-color: var(--color-card-bg);
+            min-width: 200px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.5);
+            z-index: 1;
+            padding: 10px 0;
+            border: 1px solid var(--color-border);
+            border-top: none;
+        }
+        .header__dropdown-content a {
+            color: var(--color-text-light);
+            padding: 10px 15px;
+            text-decoration: none;
+            display: block;
+        }
+        .header__dropdown-content a:hover {
+            background-color: var(--color-dark-bg);
+            color: var(--color-accent-green);
+        }
+        .header__dropdown:hover .header__dropdown-content {
+            display: block;
+        }
+        
+        /* Action Buttons */
+        .btn--primary {
+            background-color: var(--color-accent-teal);
+            border-color: var(--color-accent-teal);
+            margin-right: 10px;
+        }
+        .btn--primary:hover {
+            background-color: #008CBA;
+        }
+        .btn--secondary {
+            background-color: transparent;
+            border: 2px solid var(--color-accent-green);
+            color: var(--color-accent-green);
+            margin-left: 15px;
+        }
+        .btn--secondary:hover {
+            background-color: var(--color-accent-green);
+            color: var(--color-dark-bg);
+        }
+        .search-box {
+            display: flex;
+            align-items: center;
+        }
+        .search-box input {
+            padding: 8px 10px;
+            border: 1px solid var(--color-border);
+            background-color: var(--color-dark-bg);
+            color: var(--color-text-light);
+            border-radius: 4px 0 0 4px;
+            outline: none;
+        }
+        .search-box .btn--icon {
+            border-radius: 0 4px 4px 0;
+            border-left: none;
+        }
+
+        /* ---------------------------------- */
+        /* 2. INTERACTIVE MAP INTERFACE (CSS) */
+        /* ---------------------------------- */
+        .main-content {
+            padding-top: var(--header-height); /* Space for fixed header */
+            height: calc(100vh - var(--header-height));
+            position: relative;
+        }
+        #map {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            z-index: 10;
+        }
+        .map-controls {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            z-index: 500;
+            background-color: var(--color-card-bg);
+            padding: 10px;
+            border-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
+        }
+        .map-controls select {
+            background-color: var(--color-dark-bg);
+            color: var(--color-text-light);
+            border: 1px solid var(--color-border);
+            padding: 5px;
+            margin-left: 10px;
+        }
+
+        /* Sidebar/Pop-up Styling & Animation */
+        .sidebar {
+            position: absolute;
+            top: 0;
+            right: 0;
+            height: 100%;
+            width: 350px;
+            background-color: var(--color-card-bg);
+            z-index: 50;
+            padding: 20px;
+            box-shadow: -5px 0 15px rgba(0, 0, 0, 0.5);
+            
+            /* Animation/Transition */
+            transform: translateX(100%);
+            transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94); /* Smooth sliding animation */
+            overflow-y: auto;
+        }
+        .sidebar.active {
+            transform: translateX(0);
+        }
+        .sidebar__close-btn {
+            position: sticky;
+            top: 0;
+            float: right;
+            background: none;
+            border: none;
+            color: var(--color-text-light);
+            font-size: 1.5em;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        .sidebar__header h2 {
+            color: var(--color-accent-teal);
+            margin-bottom: 5px;
+        }
+        .status-tag {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: bold;
+            color: var(--color-dark-bg);
+        }
+        .status-ongoing { background-color: var(--color-accent-yellow); }
+        .status-completed { background-color: var(--color-accent-green); }
+        
+        .sidebar__data-block, .sidebar__description, .sidebar__signal, .sidebar__details {
+            margin-top: 20px;
+            padding-top: 10px;
+            border-top: 1px solid var(--color-border);
+        }
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+        .metric-label {
+            color: #aaa;
+        }
+        .color-green { color: var(--color-accent-green); }
+
+        /* Data Signal Line Styling */
+        .sidebar__signal h3 {
+             color: var(--color-accent-yellow);
+        }
+        .signal-score {
+            font-size: 1.2em;
+            margin-bottom: 10px;
+        }
+        .signal-indicator {
+            color: var(--color-accent-green);
+            margin-left: 10px;
+        }
+        
+        /* ---------------------------------- */
+        /* 1. DATA VIZ POP-UP (CSS) */
+        /* ---------------------------------- */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.85); /* Darker overlay */
+            z-index: 2000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            
+            /* Animation/Transition */
+            transition: opacity 0.3s ease-in-out;
+        }
+        .modal.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .modal__content {
+            background-color: var(--color-dark-bg);
+            padding: 30px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 1200px;
+            max-height: 90vh;
+            overflow-y: auto;
+            border: 2px solid var(--color-accent-teal);
+            
+            /* Scale-in Animation */
+            transform: scale(0.95);
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .modal.active .modal__content {
+            transform: scale(1);
+        }
+        
+        .modal__title {
+            color: var(--color-accent-green);
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--color-border);
+            padding-bottom: 10px;
+        }
+        .analysis-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+        .analysis-card {
+            background-color: var(--color-card-bg);
+            padding: 15px;
+            border-radius: 6px;
+        }
+        .analysis-card--full {
+            grid-column: 1 / -1; /* Spans both columns */
+        }
+        .analysis-card__title {
+            margin-bottom: 15px;
+            color: var(--color-text-light);
+        }
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+        .analysis-card__note {
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #aaa;
+        }
+        .analysis-card__note i {
+            color: var(--color-accent-yellow);
+        }
+    </style>
+</head>
+
+<body class="theme-dark">
+
+    <header class="header">
+        <div class="header__logo">
+            <i class="fas fa-chart-line"></i>
+            <h1>Livability Index</h1>
+        </div>
+        
+        <nav class="header__nav">
+            <div class="header__dropdown"><button class="header__dropdown-btn">All Counties/Areas <i class="fas fa-chevron-down"></i></button><div class="header__dropdown-content"><a href="#">Nairobi</a><a href="#">Mombasa</a></div></div>
+            <div class="header__dropdown"><button class="header__dropdown-btn">Index Tiers <i class="fas fa-chevron-down"></i></button><div class="header__dropdown-content"><a href="#">Tier 1 (Excellent)</a><a href="#">Tier 2 (Good)</a></div></div>
+            <div class="header__dropdown"><button class="header__dropdown-btn">Data Sources <i class="fas fa-chevron-down"></i></button><div class="header__dropdown-content"><a href="#">Census Data</a><a href="#">World Bank</a></div></div>
+            <div class="header__dropdown"><button class="header__dropdown-btn">Data Date <i class="fas fa-chevron-down"></i></button><div class="header__dropdown-content"><a href="#">2024</a><a href="#">2023</a></div></div>
+        </nav>
+
+        <div class="header__actions">
+            <button class="btn btn--primary" id="btn-view-all">View All</button>
+            <div class="search-box">
+                <input type="text" placeholder="Search...">
+                <button class="btn btn--icon"><i class="fas fa-search"></i></button>
+            </div>
+            <button class="btn btn--secondary" id="btn-open-analysis">
+                📊 Data Analysis
+            </button>
+        </div>
+    </header>
+
+    <main class="main-content">
+        <section id="map-container">
+            <div id="map" class="map-view"></div>
+            
+            <div class="map-controls">
+                <label for="basemap-select" class="map-controls__label">Basemap:</label>
+                <select id="basemap-select" class="map-controls__select">
+                    <option value="dark" selected>High-Contrast Dark</option>
+                    <option value="satellite">Sentinel-2 Cloudless</option>
+                    <option value="road">Basic Road Map</option>
+                    <option value="terrain">Terrain Map</option>
+                    <option value="light">Monochrome Light</option>
+                    </select>
+            </div>
+            
+            <aside id="project-sidebar" class="sidebar">
+                <button class="sidebar__close-btn" aria-label="Close Details"><i class="fas fa-times"></i></button>
+                <div class="sidebar__header">
+                    <h2 id="project-name">Placeholder Project Name</h2>
+                    <span id="project-status" class="status-tag status-completed">Completed</span>
+                    <p class="sidebar__subtitle">Thematic Area: <span id="project-theme">Education</span></p>
+                </div>
+
+                <div class="sidebar__data-block">
+                    <h3>Key Metrics</h3>
+                    <div class="metric-row"><p class="metric-label">Funder / Source:</p><p class="metric-value" id="project-funder">NGO Partners</p></div>
+                    <div class="metric-row"><p class="metric-label">Location (County):</p><p class="metric-value" id="project-county">Kilifi</p></div>
+                    <div class="metric-row"><p class="metric-label">Cost / Value:</p><p class="metric-value color-green" id="project-cost">$2.1 Million</p></div>
+                    <div class="metric-row"><p class="metric-label">Beneficiaries:</p><p class="metric-value" id="project-beneficiaries">15,000</p></div>
+                </div>
+                
+                <div class="sidebar__signal">
+                    <h3>Livability Score Trend (Last 3 Yrs)</h3>
+                    <p class="signal-score">
+                        Score: <span class="color-yellow">82/100</span> 
+                        <span class="signal-indicator"><i class="fas fa-arrow-up"></i> +12%</span>
+                    </p>
+                    <canvas id="signal-line-chart" class="signal-line-chart"></canvas>
+                </div>
+
+                <details class="sidebar__details">
+                    <summary>Detailed Impact Analysis</summary>
+                    <ul id="project-impact-list" class="impact-list">
+                        <li>New school enrollment up by 20%.</li>
+                        <li>Child health metrics improved significantly.</li>
+                    </ul>
+                </details>
+            </aside>
+        </section>
+    </main>
+
+    <div id="analysis-modal" class="modal modal--hidden">
+        <div class="modal__content">
+            <button class="sidebar__close-btn modal__close-btn" id="btn-close-analysis" aria-label="Close Analysis"><i class="fas fa-times"></i></button>
+            <h2 class="modal__title">📊 Projects Statistics & Livability Index Analysis</h2>
+            
+            <div class="analysis-grid">
+                
+                <div class="analysis-card analysis-card--half">
+                    <h3 class="analysis-card__title">Total Components Status Breakdown</h3>
+                    <div class="chart-container"><canvas id="status-bar-chart"></canvas></div>
+                </div>
+
+                <div class="analysis-card analysis-card--half">
+                    <h3 class="analysis-card__title">Index Weighting by Thematic Area</h3>
+                    <div class="chart-container"><canvas id="weighting-donut-chart"></canvas></div>
+                </div>
+
+                <div class="analysis-card analysis-card--full">
+                    <h3 class="analysis-card__title">Index Score vs. Population Density (Per County)</h3>
+                    <div class="chart-container" style="height: 400px;"><canvas id="county-scatter-plot"></canvas></div>
+                    <p class="analysis-card__note"><i class="fas fa-info-circle"></i> Identify outliers: areas with high density but low Livability Index scores.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
+    <script>
+        // Mock Data for demonstration
+        const mockProjects = [
+            { id: 1, lat: -1.286389, lng: 36.817223, name: 'Water Sanitation Project', status: 'completed', theme: 'Water', cost: 12500000, county: 'Nairobi' },
+            { id: 2, lat: -4.054660, lng: 39.663577, name: 'Coastal Education Hub', status: 'ongoing', theme: 'Education', cost: 7800000, county: 'Mombasa' },
+            { id: 3, lat: 0.516667, lng: 35.266667, name: 'Uasin Gishu Road Upgrade', status: 'awarding', theme: 'Infrastructure', cost: 25000000, county: 'Eldoret' },
+            // Add more mock data points to create clusters
+            { id: 4, lat: -1.28, lng: 36.81, name: 'Nairobi Health Clinic', status: 'completed', theme: 'Health', cost: 1500000, county: 'Nairobi' },
+            { id: 5, lat: -1.285, lng: 36.815, name: 'Nairobi Housing Initiative', status: 'ongoing', theme: 'Housing', cost: 45000000, county: 'Nairobi' },
+        ];
+        
+        // --- 2. INTERACTIVE MAP INITIALIZATION (POWER) ---
+        
+        const map = L.map('map', {
+            center: [-0.0236, 37.9062], // Center on Kenya
+            zoom: 6,
+            minZoom: 2,
+            maxZoom: 18,
+            attributionControl: false,
+            zoomControl: false
+        });
+
+        // Mapbox Access Token (replace with a real token in production)
+        const MAPBOX_TOKEN = 'pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4N'
+                           + 'GtoYjIwZ25ydWt'
+                           + '2d3h6dzh2bWIifQ.yJALoZZXGto4z7K8J'
+                           + 'wGzQ';
+        
+        const tileLayers = {
+            'dark': L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/dark-v10/tiles/{z}/{x}/{y}?access_token=' + MAPBOX_TOKEN, { maxZoom: 18 }),
+            'satellite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18 }),
+            'road': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }),
+            'terrain': L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/outdoors-v11/tiles/{z}/{x}/{y}?access_token=' + MAPBOX_TOKEN, { maxZoom: 18 }),
+            'light': L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/light-v10/tiles/{z}/{x}/{y}?access_token=' + MAPBOX_TOKEN, { maxZoom: 18 })
+        };
+        
+        // Set Dark Basemap as default
+        tileLayers['dark'].addTo(map);
+
+        // Marker Clustering
+        const markers = L.markerClusterGroup({
+            chunkedLoading: true,
+            iconCreateFunction: function(cluster) {
+                const count = cluster.getChildCount();
+                let size = 'cluster-medium';
+                if (count < 10) { size = 'cluster-small'; }
+                else if (count > 50) { size = 'cluster-large'; }
+                
+                // Styling for clusters (uses background color from CSS)
+                return L.divIcon({ 
+                    html: `<div><span>${count}</span></div>`, 
+                    className: `marker-cluster ${size}`, 
+                    iconSize: L.point(40, 40) 
+                });
+            }
+        });
+
+        // Add Markers to Cluster Group
+        mockProjects.forEach(project => {
+            const marker = L.marker([project.lat, project.lng]);
+            marker.projectData = project; // Attach data to marker
+            
+            // Marker Click Event to show Sidebar (ANIMATION)
+            marker.on('click', function(e) {
+                showProjectDetails(e.target.projectData);
+            });
+            
+            markers.addLayer(marker);
+        });
+        
+        map.addLayer(markers);
+
+        // Basemap Switch Logic
+        document.getElementById('basemap-select').addEventListener('change', function(e) {
+            Object.values(tileLayers).forEach(layer => map.removeLayer(layer));
+            tileLayers[e.target.value].addTo(map);
+        });
+
+        // Function to handle Sidebar display (ANIMATION)
+        const sidebar = document.getElementById('project-sidebar');
+        const closeSidebarBtn = sidebar.querySelector('.sidebar__close-btn');
+
+        function showProjectDetails(data) {
+            document.getElementById('project-name').textContent = data.name;
+            document.getElementById('project-status').textContent = data.status.charAt(0).toUpperCase() + data.status.slice(1);
+            document.getElementById('project-status').className = 'status-tag status-' + data.status;
+            document.getElementById('project-theme').textContent = data.theme;
+            document.getElementById('project-funder').textContent = data.funder || 'Government Fund';
+            document.getElementById('project-county').textContent = data.county;
+            document.getElementById('project-cost').textContent = `$${(data.cost / 1000000).toFixed(1)} Million`;
+            document.getElementById('project-beneficiaries').textContent = data.beneficiaries || '5,000+';
+
+            sidebar.classList.add('active'); // Triggers the slide-in CSS animation
+            // Update the signal line chart (implementation below)
+            updateSignalChart();
+        }
+
+        closeSidebarBtn.addEventListener('click', () => {
+            sidebar.classList.remove('active'); // Triggers the slide-out CSS animation
+        });
+
+        // --- 1. DATA VISUALIZATION CHART INITIALIZATION (POWER) ---
+        
+        const analysisModal = document.getElementById('analysis-modal');
+        document.getElementById('btn-open-analysis').addEventListener('click', () => {
+            analysisModal.classList.add('active'); // Triggers the fade-in/scale-in animation
+            // Initializing charts when modal opens to ensure correct sizing
+            setTimeout(() => {
+                initStatusBarChart();
+                initWeightingDonutChart();
+                initScatterPlot();
+            }, 300); 
+        });
+
+        document.getElementById('btn-close-analysis').addEventListener('click', () => {
+            analysisModal.classList.remove('active'); // Triggers the fade-out/scale-out animation
+        });
+
+        // Chart 1: Status Bar Chart
+        function initStatusBarChart() {
+            const ctx = document.getElementById('status-bar-chart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Awarding Stage', 'Ongoing', 'Completed'],
+                    datasets: [{
+                        label: 'Total Projects',
+                        data: [15, 30, 55],
+                        backgroundColor: [
+                            'var(--color-accent-teal)', 
+                            'var(--color-accent-yellow)', 
+                            'var(--color-accent-green)'
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y', // Vertical Bar Chart
+                    scales: {
+                        x: { grid: { color: 'var(--color-border)' }, ticks: { color: 'var(--color-text-light)' } },
+                        y: { grid: { display: false }, ticks: { color: 'var(--color-text-light)' } }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+        
+        // Chart 2: Weighting Donut Chart
+        function initWeightingDonutChart() {
+            const ctx = document.getElementById('weighting-donut-chart').getContext('2d');
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Health (35%)', 'Education (30%)', 'Water (20%)', 'Infrastructure (15%)'],
+                    datasets: [{
+                        data: [35, 30, 20, 15],
+                        backgroundColor: ['#e57373', '#81c784', '#64b5f6', '#ffb74d'], // Example vibrant colors
+                        hoverOffset: 10
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'right', labels: { color: 'var(--color-text-light)' } } }
+                }
+            });
+        }
+        
+        // Chart 3: Scatter Plot
+        function initScatterPlot() {
+            const ctx = document.getElementById('county-scatter-plot').getContext('2d');
+            new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'County Index Data',
+                        data: [
+                            { x: 5000, y: 85, label: 'County A' },
+                            { x: 8000, y: 40, label: 'County B (Outlier)' },
+                            { x: 3000, y: 70, label: 'County C' },
+                            { x: 6500, y: 90, label: 'County D' },
+                            { x: 2000, y: 55, label: 'County E' },
+                        ],
+                        backgroundColor: 'var(--color-accent-teal)',
+                        pointRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: 'Population Density (per sq km)', color: 'var(--color-text-light)' }, grid: { color: 'var(--color-border)' }, ticks: { color: 'var(--color-text-light)' } },
+                        y: { title: { display: true, text: 'Livability Index Score', color: 'var(--color-text-light)' }, grid: { color: 'var(--color-border)' }, ticks: { color: 'var(--color-text-light)' } }
+                    },
+                    plugins: { tooltip: { callbacks: { label: (context) => context.raw.label + `: (${context.raw.x}, ${context.raw.y})` } } }
+                }
+            });
+        }
+        
+        // Signal Line Chart (Mini Chart in Sidebar)
+        function updateSignalChart() {
+            const ctx = document.getElementById('signal-line-chart').getContext('2d');
+            // Destroy previous instance to avoid conflicts
+            if (window.signalChartInstance) {
+                window.signalChartInstance.destroy();
+            }
+            
+            window.signalChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['2022', '2023', '2024'],
+                    datasets: [{
+                        label: 'Score',
+                        data: [70, 75, 82], // Example data
+                        borderColor: 'var(--color-accent-green)',
+                        backgroundColor: 'rgba(76, 175, 80, 0.2)',
+                        tension: 0.4,
+                        pointRadius: 4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { x: { display: false }, y: { display: false, min: 50, max: 100 } },
+                    plugins: { legend: { display: false }, tooltip: { enabled: true } }
+                }
+            });
+        }
+
+    </script>
+</body>
+</html>
