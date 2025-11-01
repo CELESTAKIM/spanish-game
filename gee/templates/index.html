@@ -1,0 +1,771 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Kenya GIS Explorer</title>
+
+  <!-- External libs -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/proj4@2.7.5/dist/proj4.js"></script>
+  <script src="https://unpkg.com/proj4leaflet@1.0.2/src/proj4leaflet.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+
+  <style>
+    /* ===========================
+       Base & Resets
+       =========================== */
+    :root{
+      --bg:#071124;
+      --panel:#081626;
+      --muted:#97a7b6;
+      --accent:#0fb5d6;
+      --green:#43a047;
+      --yellow:#f9a825;
+      --glass: rgba(255,255,255,0.03);
+      --radius:12px;
+      --shadow: 0 12px 40px rgba(2,6,23,0.6);
+      --panel-w:420px;
+    }
+    *{box-sizing:border-box}
+    html,body,#map{height:100%; margin:0; padding:0; font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial}
+    body{background:linear-gradient(180deg,#031024 0%, #071224 100%); color:#e8f7fb; overflow:hidden}
+    a{color:var(--accent)}
+
+    /* ===========================
+       Header
+       =========================== */
+    header.topbar{
+      position:fixed; left:12px; right:12px; top:12px; height:64px; z-index:1400;
+      background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border-radius:12px; padding:10px 18px; display:flex; gap:12px; align-items:center; justify-content:space-between;
+      box-shadow:var(--shadow); border:1px solid rgba(255,255,255,0.03); backdrop-filter: blur(6px);
+    }
+    .brand{display:flex; align-items:center; gap:12px}
+    .brand .logo{width:46px; height:46px; border-radius:10px; display:grid; place-items:center; font-size:20px; background:linear-gradient(90deg,var(--accent), #0a7fa0); color:#071022}
+    .brand h1{margin:0; font-size:16px; letter-spacing:0.2px}
+    .brand p{margin:0; font-size:12px; color:var(--muted)}
+
+    .controls{display:flex; gap:8px; align-items:center}
+    .btn{background:var(--glass); border:1px solid rgba(255,255,255,0.03); padding:8px 12px; border-radius:10px; color:var(--accent); cursor:pointer; display:inline-flex; gap:8px; align-items:center; font-weight:600}
+    .btn.primary{background:linear-gradient(90deg,var(--accent), #0b9ec6); color:#08121a; border:none}
+    .btn.ghost{background:transparent; border:1px solid rgba(255,255,255,0.06); color:#dff6ff}
+
+    /* ===========================
+       Map
+       =========================== */
+    #map{position:absolute; inset:0; z-index:1}
+    .leaflet-control-container .leaflet-top.leaflet-left { top: 86px; } /* push default controls down a bit */
+
+    /* ===========================
+       Left Tools (floating)
+       =========================== */
+    .left-tools{position:fixed; left:18px; top:92px; display:flex; flex-direction:column; gap:10px; z-index:1300}
+    .tool{background:var(--panel); min-width:56px; height:56px; border-radius:12px; display:grid; place-items:center; box-shadow:var(--shadow); border:1px solid rgb(153, 215, 19); cursor:pointer}
+    .tool small{display:block; font-size:11px; color:var(--muted); margin-top:6px}
+
+    /* ===========================
+       Basemap Picker (bottom-left)
+       =========================== */
+    .basemap-picker{position:fixed; left:18px; bottom:18px; z-index:1300; display:flex; gap:8px; padding:10px; border-radius:12px; background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border:1px solid rgba(255,255,255,0.03)}
+    .base-thumb{width:80px; height:56px; border-radius:8px; overflow:hidden; border:2px solid transparent; cursor:pointer; box-shadow:0 6px 18px rgba(0,0,0,0.4)}
+    .base-thumb.active{transform: translateY(-6px); border-color:var(--accent); box-shadow:0 10px 30px rgba(11,159,178,0.12)}
+
+    /* ===========================
+       Right Sidebar / Details
+       =========================== */
+    .sidebar{position:fixed; right:12px; top:92px; width:var(--panel-w); height:calc(100vh - 120px); z-index:1400; background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); padding:14px; border-radius:14px; box-shadow:var(--shadow); border:1px solid rgba(255,255,255,0.03); overflow:auto}
+    .sidebar.hidden{transform:translateX(120%); transition:transform .28s ease}
+    .sidebar .title{display:flex; justify-content:space-between; align-items:center}
+    .sidebar h3{margin:0}
+    .sidebar .meta{font-size:12px; color:var(--muted)}
+
+    .prop-list{margin-top:10px; display:grid; gap:8px}
+    .prop-item{display:flex; justify-content:space-between; background:#3af92cc3; padding:8px; border-radius:8px; border:1px solid rgba(255,255,255,0.02)}
+    .prop-item .k{color:var(--muted); font-size:12px}
+    .prop-item .v{font-weight:700; font-size:13px; color:#ffde49f1}
+
+    /* ===========================
+       Popup styles
+       =========================== */
+    .custom-popup{min-width:260px; border-radius:12px; background:linear-gradient(180deg,#08121a,#061522); padding:12px; color:#eafcff; box-shadow:0 10px 30px rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.03)}
+    .custom-popup h4{margin:0 0 8px 0; color:var(--accent)}
+    .custom-popup .row{display:flex; justify-content:space-between; margin:6px 0; font-size:13px}
+    .custom-popup .row small{color:var(--muted)}
+
+    /* ===========================
+       Legend & inset & toast
+       =========================== */
+    .legend{position:fixed; right:12px; bottom:18px; z-index:1300; padding:10px; border-radius:10px; background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border:1px solid rgba(255,255,255,0.03); max-height:260px; overflow:auto}
+    .legend .item{display:flex; gap:8px; align-items:center; padding:6px}
+    .swatch{width:18px; height:12px; border-radius:3px}
+
+    .inset{position:fixed; left:18px; bottom:100px; width:180px; height:120px; z-index:1350; border-radius:10px; overflow:hidden; border:1px solid rgba(255,255,255,0.03); box-shadow:var(--shadow); background:var(--panel)}
+    .inset .title{padding:8px; font-size:12px; color:var(--muted)}
+    .inset #mini-map{width:100%; height:calc(100% - 28px)}
+
+    .toast{position:fixed; top:86px; right:calc(var(--panel-w) + 36px); z-index:1500; min-width:260px; background:#06232b; padding:12px 14px; border-radius:10px; display:none; color:#dff6ff; box-shadow:var(--shadow); border:1px solid rgba(255,255,255,0.03)}
+    .toast.show{display:block; animation:toastIn .36s ease}
+    @keyframes toastIn{from{opacity:0; transform:translateY(-8px)}to{opacity:1; transform:none}}
+
+    /* responsive */
+    @media (max-width:900px){
+      .sidebar{width:100%; right:0; left:0; top:auto; bottom:0; height:48vh; border-radius:14px 14px 0 0}
+      .toast{right:20px; top:auto; bottom:calc(48vh + 22px)}
+      .brand h1{font-size:14px}
+      .base-thumb{width:64px; height:48px}
+      .inset{left:calc(50% - 90px)}
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <header class="topbar" role="banner">
+    <div class="brand" role="navigation">
+      <div class="logo" aria-hidden="true"><i class="fas fa-globe-africa"></i></div>
+      <div>
+        <h1>Kenya GIS Explorer</h1>
+        <p>Counties & Constituencies — interactive viewer</p>
+      </div>
+    </div>
+
+    <div class="controls" role="toolbar" aria-label="Main controls">
+      <button class="btn ghost" id="refreshBtn" title="Refresh layers"><i class="fas fa-sync-alt"></i> Refresh</button>
+      <button class="btn" id="modeSystem" title="System mode"><i class="fas fa-laptop-code"></i> System</button>
+      <button class="btn" id="modeGreen" title="Green mode"><i class="fas fa-leaf"></i> Green</button>
+      <button class="btn" id="modeYellow" title="Yellow mode"><i class="fas fa-sun"></i> Yellow</button>
+      <button class="btn primary" id="toggleSidebar"><i class="fas fa-info-circle"></i> Details</button>
+    </div>
+  </header>
+
+  <!-- Map -->
+  <div id="map" role="application" aria-label="Kenya map"></div>
+
+  <!-- Left tools -->
+  <div class="left-tools" role="group" aria-label="Tools">
+    <div class="tool" id="locate"><i class="fas fa-location-crosshairs"></i></div>
+    <div class="tool" id="measure"><i class="fas fa-ruler-combined"></i></div>
+    <div class="tool" id="clearSel"><i class="fas fa-eraser"></i></div>
+  </div>
+
+  <!-- Basemap picker -->
+  <div class="basemap-picker" id="basemapPicker" role="list">
+    <!-- thumbs will be injected by JS -->
+  </div>
+
+  <!-- Inset mini map -->
+  <div class="inset" aria-hidden="false">
+    <div class="title">Kenya overview (click to zoom)</div>
+    <div id="mini-map"></div>
+  </div>
+
+  <!-- Sidebar -->
+  <aside class="sidebar hidden" id="sidebar" role="complementary" aria-label="Feature details">
+    <div class="title">
+      <div>
+        <h3 id="sideTitle">Select a county or constituency</h3>
+        <div class="meta" id="sideMeta">Tap a polygon to view properties</div>
+      </div>
+      <div>
+        <button class="btn ghost" id="closeSide"><i class="fas fa-times"></i></button>
+      </div>
+    </div>
+
+    <div style="margin-top:12px;">
+      <div style="display:flex; gap:8px; align-items:center; justify-content:space-between;">
+        <div style="font-weight:800;" id="detailName">—</div>
+        <div style="font-size:12px; color:var(--muted)" id="detailCode">—</div>
+      </div>
+
+      <div style="margin-top:10px;" id="detailActions">
+        <button class="btn ghost" id="copyProps"><i class="fas fa-copy"></i> Copy properties</button>
+        <button class="btn primary" id="downloadFeature"><i class="fas fa-download"></i> Download GeoJSON</button>
+      </div>
+
+      <div class="prop-list" id="propList" style="margin-top:10px;">
+        <!-- properties injected here -->
+      </div>
+
+      <div style="margin-top:12px;">
+        <canvas id="detailChart" height="120"></canvas>
+      </div>
+
+      <div style="margin-top:12px;">
+        <h4 style="margin:0 0 8px 0">Quick stats</h4>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          <div style="background:rgba(255,255,255,0.02); padding:8px; border-radius:8px;">
+            <div style="font-size:12px; color:var(--muted)">Features</div>
+            <div id="statFeatures" style="font-weight:800; font-size:18px">—</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.02); padding:8px; border-radius:8px;">
+            <div style="font-size:12px; color:var(--muted)">Total area</div>
+            <div id="statArea" style="font-weight:800; font-size:18px">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Legend -->
+  <div class="legend" id="legend">
+    <div style="font-weight:700; color:#dffcff; margin-bottom:8px;">Legend</div>
+    <div id="legendList"></div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <!-- Template popup -->
+  <template id="popupTemplate">
+    <div class="custom-popup">
+      <h4 class="p-name">NAME</h4>
+      <div class="row"><small>Code</small><div class="val">—</div></div>
+      <div class="row"><small>Area</small><div class="val">—</div></div>
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:8px;">
+        <button class="btn ghost popup-copy">Copy</button>
+        <button class="btn primary popup-download">Download</button>
+      </div>
+    </div>
+  </template>
+
+  <!-- Scripts -->
+  <script>
+    // ============================
+    // Config / Globals
+    // ============================
+    const API = {
+      COUNTIES: "/get_counties",
+      CONSTITUENCIES: "/get_constituencies",
+      KENYA_INSET: "/get_kenya_inset",
+      PROPERTIES: "/properties",
+      DOWNLOAD: "/download_feature",
+      META: "/meta",
+      HEALTH: "/health"
+    };
+
+    const MODES = { system: "system", green: "green", yellow: "yellow" };
+    let currentMode = "{{ mode }}" === undefined ? "system" : "{{ mode }}";
+    // If Flask didn't render variable (because we're static), default to system:
+    if (!currentMode) currentMode = "system";
+
+    // Helper toast
+    function showToast(msg, type="info", timeout=4000){
+      const t = document.getElementById("toast");
+      t.innerText = msg;
+      t.style.background = (type === "error") ? "linear-gradient(180deg, rgba(255,80,80,0.12), rgba(255,80,80,0.06))" : "#06242e";
+      t.classList.add("show");
+      setTimeout(()=> t.classList.remove("show"), timeout);
+    }
+
+    // Stable color map
+    const colorMap = {}; // name -> color
+    function colorForName(name){
+      if (!name) return "#888";
+      if (colorMap[name]) return colorMap[name];
+      // deterministic HSL by hashing name
+      let hash = 0;
+      for (let i=0;i<name.length;i++){ hash = (hash<<5) - hash + name.charCodeAt(i); hash |= 0; }
+      const hue = Math.abs(hash) % 360;
+      const sat = 68;
+      const light = 52;
+      const c = `hsl(${hue}, ${sat}%, ${light}%)`;
+      colorMap[name] = c;
+      return c;
+    }
+
+    // Fallback placeholder image data (tiny SVG)
+    function placeholderThumb(color="#0fb5d6"){
+      const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='160' height='100'><rect width='100%' height='100%' fill='${color}'/></svg>`;
+      return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+    }
+
+    // ============================
+    // Map Initialization
+    // ============================
+    const map = L.map('map', { center: [0.0236, 37.9062], zoom: 6, preferCanvas: true });
+
+    // Basemap registry
+    const BASES = {
+      "OpenStreetMap": L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "OpenStreetMap" }),
+      "GoogleSat": L.tileLayer("https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}", { subdomains:["mt0","mt1","mt2","mt3"], attribution:"Google" }),
+      "EsriImagery": L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { attribution: "Esri" }),
+      "CartoDark": L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", { attribution: "CartoDB" }),
+      "StamenTerrain": L.tileLayer("https://stamen-tiles.a.ssl.fastly.net/terrain/{z}/{x}/{y}.jpg", { attribution: "Stamen" }),
+      "OpenTopo": L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", { attribution: "OpenTopoMap" }),
+      "EsriTopo": L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}", { attribution: "Esri Topo" }),
+      "CartoPositron": L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", { attribution: "CartoDB" })
+    };
+    BASES["OpenStreetMap"].addTo(map);
+
+    // Build basemap picker UI (with placeholder thumbs if external tiles fail)
+    const basemapPicker = document.getElementById("basemapPicker");
+    Object.keys(BASES).forEach((k, idx) => {
+      const thumb = document.createElement("div");
+      thumb.className = "base-thumb " + (idx===0 ? "active" : "");
+      thumb.title = k;
+      const img = document.createElement("img");
+      img.style.width = "100%";
+      img.style.height = "100%";
+      img.style.objectFit = "cover";
+      // choose preview url where possible
+      const previews = {
+        "GoogleSat": "https://mt1.google.com/vt/lyrs=s&x=132&y=193&z=9",
+        "OpenStreetMap": "https://a.tile.openstreetmap.org/9/265/386.png",
+        "EsriImagery": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/9/132/193",
+        "CartoDark": "https://a.basemaps.cartocdn.com/dark_all/9/132/193.png",
+        "StamenTerrain": "https://stamen-tiles.a.ssl.fastly.net/terrain/9/132/193.jpg",
+        "OpenTopo": "https://a.tile.opentopomap.org/9/132/193.png",
+        "EsriTopo": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/9/132/193",
+        "CartoPositron": "https://a.basemaps.cartocdn.com/light_all/9/132/193.png"
+      };
+      img.src = previews[k] || placeholderThumb();
+      // if image fails, use placeholder
+      img.onerror = () => { img.src = placeholderThumb(); };
+      thumb.appendChild(img);
+      thumb.onclick = () => {
+        document.querySelectorAll(".base-thumb").forEach(t=>t.classList.remove("active"));
+        thumb.classList.add("active");
+        Object.values(BASES).forEach(b=> map.removeLayer(b));
+        BASES[k].addTo(map);
+      };
+      basemapPicker.appendChild(thumb);
+    });
+
+    // scale control
+    L.control.scale({imperial:false}).addTo(map);
+
+    // ============================
+    // Layers: counties, constituency, inset
+    // ============================
+    let countiesLayer = null;
+    let constituencyLayer = null;
+    let miniLayer = null;
+    let selectedLayer = null;
+
+    // Utility to style features with stable colors
+    function styleFeature(feature) {
+      const props = feature.properties || {};
+      const name = props.COUNTY_NAM || props.county_nam || props.NAME_1 || props.county_nam || props.COUNTY_NAM || props.county_nam || props.county || props.name || "unknown";
+      const color = colorForName(String(name));
+      return { color: "#071a1f", weight: 1, fillColor: color, fillOpacity: 0.66 };
+    }
+
+    function highlightStyle() {
+      return { color: "#050b0c", weight: 3, fillOpacity: 0.95 };
+    }
+
+    // Fetch and render Counties
+    async function loadCounties(refresh=false){
+      try{
+        const url = API.COUNTIES + (refresh ? "?refresh=1" : "");
+        const res = await fetch(url);
+        if (!res.ok) {
+          const err = await res.json().catch(()=>({error:"server error"}));
+          throw new Error(err.error || res.statusText);
+        }
+        const geojson = await res.json();
+        if (!geojson || !geojson.features) throw new Error("Invalid GeoJSON");
+
+        if (countiesLayer){ countiesLayer.remove(); }
+        countiesLayer = L.geoJson(geojson, {
+          style: styleFeature,
+          onEachFeature: function(feature, layer){
+            const props = feature.properties || {};
+            const label = props.COUNTY_NAM || props.county_nam || props.NAME_1 || props.NAME_1 || props.COUNTY_NAM || "Unknown";
+            layer.bindTooltip(label, {direction:"center", permanent:false, className:"county-tooltip"});
+            layer.on({
+              click: (e)=> featureClickHandler(feature, layer, "counties", e),
+              mouseover: (e)=> { layer.setStyle({weight:2, fillOpacity:0.9}); layer.bringToFront(); },
+              mouseout: (e)=> { if (selectedLayer !== layer) countiesLayer.resetStyle(layer); }
+            });
+          }
+        }).addTo(map);
+        // Fit map to bounds
+        try{
+          const bounds = countiesLayer.getBounds();
+          if (bounds.isValid()) map.fitBounds(bounds.pad(0.03));
+        }catch(e){}
+        populateLegendFromLayer(countiesLayer, "COUNTY_NAM");
+        showToast("Counties loaded", "success", 2000);
+      }catch(err){
+        console.error(err);
+        showToast("Counties load failed: "+err.message, "error", 6000);
+      }
+    }
+
+    // Fetch and render Constituencies
+    async function loadConstituencies(refresh=false){
+      try{
+        const url = API.CONSTITUENCIES + (refresh ? "?refresh=1" : "");
+        const res = await fetch(url);
+        if (!res.ok) {
+          const err = await res.json().catch(()=>({error:"server error"}));
+          throw new Error(err.error || res.statusText);
+        }
+        const geojson = await res.json();
+        if (!geojson || !geojson.features) throw new Error("Invalid GeoJSON");
+
+        if (constituencyLayer){ constituencyLayer.remove(); }
+        constituencyLayer = L.geoJson(geojson, {
+          style: function(f){
+            // color by constituency name to get many colors
+            const n = f.properties.constituency || f.properties.const_nam || f.properties.CONSTITUEN || f.properties.Name || f.properties.name || "const";
+            return { color: "#052022", weight: 1, fillColor: colorForName(String(n)), fillOpacity: 0.45 };
+          },
+          onEachFeature: function(feature, layer){
+            const props = feature.properties || {};
+            const label = props.const_nam || props.CONST_NAM || props.Name || props.name || "Constituency";
+            layer.bindTooltip(label, {direction:"center", permanent:false});
+            layer.on({
+              click: (e)=> featureClickHandler(feature, layer, "constituency", e),
+              mouseover: (e)=> { layer.setStyle({weight:2, fillOpacity:0.85}); layer.bringToFront(); },
+              mouseout: (e)=> { if (selectedLayer !== layer) constituencyLayer.resetStyle(layer); }
+            });
+          }
+        }).addTo(map);
+        populateLegendFromLayer(constituencyLayer, "const_nam");
+        showToast("Constituencies loaded", "success", 1500);
+      }catch(err){
+        console.error(err);
+        showToast("Constituencies load failed: "+err.message, "error", 6000);
+      }
+    }
+
+    // Mini/inset map
+    let miniMap = null;
+    async function loadMiniMap(){
+      try{
+        const res = await fetch(API.KENYA_INSET);
+        if (!res.ok) throw new Error("Inset fetch failed");
+        const gj = await res.json();
+        if (!miniMap){
+          miniMap = L.map('mini-map', { attributionControl:false, zoomControl:false, dragging:false, scrollWheelZoom:false, doubleClickZoom:false, boxZoom:false, tap:false });
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(miniMap);
+        } else {
+          miniMap.eachLayer((l)=> miniMap.removeLayer(l));
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(miniMap);
+        }
+        miniLayer = L.geoJson(gj, { style:{ color:"#0fb5d6", weight:1, fillColor:"#082b2f", fillOpacity:0.15 } }).addTo(miniMap);
+        const b = miniLayer.getBounds();
+        if (b.isValid()) miniMap.fitBounds(b.pad(0.02));
+        // make mini clickable to zoom main map
+        miniLayer.eachLayer(l=>{
+          l.on('click', ()=>{
+            try{ map.fitBounds(l.getBounds().pad(0.05)); showToast("Zoomed to Kenya overview", "success"); }catch(e){}
+          });
+        });
+      }catch(e){
+        console.warn("Mini map load failed:", e);
+      }
+    }
+
+    // Populate legend
+    function populateLegendFromLayer(layer, nameProp){
+      const list = document.getElementById("legendList");
+      list.innerHTML = "";
+      if (!layer) return;
+      // collect up to 30 labels
+      const names = new Set();
+      layer.eachLayer(l=>{
+        const p = l.feature && l.feature.properties;
+        if (!p) return;
+        const nm = p[nameProp] || p.NAME_1 || p.COUNTY_NAM || p.const_nam || p.Name || p.name || null;
+        if (nm && !names.has(nm) && names.size < 30) names.add(nm);
+      });
+      names.forEach(n=>{
+        const row = document.createElement("div");
+        row.className = "item";
+        const sw = document.createElement("div");
+        sw.className = "swatch";
+        sw.style.background = colorForName(String(n));
+        const label = document.createElement("div");
+        label.style.fontSize="13px"; label.style.color="#dffcff"; label.style.marginLeft="8px"; label.innerText = n;
+        row.appendChild(sw); row.appendChild(label);
+        list.appendChild(row);
+      });
+    }
+
+    // ============================
+    // Feature click handler (unified)
+    // ============================
+    let currentFeatureMeta = null; // object with {layerName, properties, leafletLayer}
+
+    async function featureClickHandler(feature, layer, layerName, e){
+      try{
+        if (selectedLayer && selectedLayer !== layer){
+          // reset style of previous
+          if (selectedLayer.feature) {
+            // try to reset via top-level layers
+            if (countiesLayer && countiesLayer.hasLayer && countiesLayer.hasLayer(selectedLayer._leaflet_id)) countiesLayer.resetStyle(selectedLayer);
+            if (constituencyLayer && constituencyLayer.hasLayer && constituencyLayer.hasLayer(selectedLayer._leaflet_id)) constituencyLayer.resetStyle(selectedLayer);
+          }
+        }
+        selectedLayer = layer;
+        layer.setStyle(highlightStyle());
+        // Build rich popup
+        openRichPopup(feature, layer, layerName, e.latlng);
+        populateSidebarForFeature(feature, layerName);
+      }catch(err){ console.error(err); showToast("Error handling feature click", "error"); }
+    }
+
+    function openRichPopup(feature, layer, layerName, latlng){
+      const tmpl = document.getElementById('popupTemplate').content.cloneNode(true);
+      const root = tmpl.querySelector('.custom-popup');
+      const title = tmpl.querySelector('.p-name');
+      title.innerText = (feature.properties && (feature.properties.COUNTY_NAM || feature.properties.county_nam || feature.properties.NAME_1 || feature.properties.Name || feature.properties.const_nam || "Feature"));
+      const rows = tmpl.querySelectorAll('.row');
+      // fill code/area
+      const code = feature.properties && (feature.properties.COUNTY_COD || feature.properties.const_no || feature.properties.objectid || feature.properties.ID_ || "—");
+      const area = feature.properties && (feature.properties.Shape_Area || feature.properties.Shape_Area || feature.properties.st_area_sh || "—");
+      rows[0].querySelector('.val').innerText = code;
+      rows[1].querySelector('.val').innerText = (typeof area === "number") ? Number(area).toFixed(2) : area;
+      // copy & download bindings
+      tmpl.querySelector('.popup-copy').addEventListener('click', ()=>{
+        try{
+          navigator.clipboard.writeText(JSON.stringify(feature.properties, null, 2));
+          showToast("Properties copied", "success");
+        }catch(e){ showToast("Copy failed", "error"); }
+      });
+      tmpl.querySelector('.popup-download').addEventListener('click', ()=>{
+        downloadFeature(layerName, feature);
+      });
+      L.popup({ maxWidth: 420, className: "leaflet-popup-no-arrow" }).setLatLng(latlng).setContent(root).openOn(map);
+    }
+
+    // Sidebar population
+    function populateSidebarForFeature(feature, layerName){
+      currentFeatureMeta = { layerName, properties: feature.properties, feature: feature };
+      document.getElementById('sidebar').classList.remove('hidden');
+      document.getElementById('sideTitle').innerText = feature.properties.COUNTY_NAM || feature.properties.const_nam || feature.properties.Name || feature.properties.NAME_1 || "Feature";
+      document.getElementById('sideMeta').innerText = layerName.toUpperCase();
+
+      document.getElementById('detailName').innerText = document.getElementById('sideTitle').innerText;
+      document.getElementById('detailCode').innerText = feature.properties.CONST_CODE || feature.properties.const_no || feature.properties.COUNTY_COD || feature.properties.objectid || "";
+
+      const list = document.getElementById('propList');
+      list.innerHTML = "";
+      const props = feature.properties || {};
+      // present important properties first if available
+      const order = ["GlobalID","Shape_Area","Shape_Leng","const_nam","const_no","county_nam","objectid","st_area_sh","st_length_","CONSTITUEN","COUNTY_NAM","NAME_1","population","area"];
+      const used = new Set();
+      order.forEach(k=>{
+        if (props[k] !== undefined && props[k] !== null){
+          const item = document.createElement("div"); item.className="prop-item";
+          const a = document.createElement("div"); a.className="k"; a.innerText = k;
+          const b = document.createElement("div"); b.className="v"; b.innerText = String(props[k]);
+          item.appendChild(a); item.appendChild(b);
+          list.appendChild(item);
+          used.add(k);
+        }
+      });
+      // then list other properties
+      Object.keys(props).forEach(k=>{
+        if (used.has(k)) return;
+        const item = document.createElement("div"); item.className="prop-item";
+        const a = document.createElement("div"); a.className="k"; a.innerText = k;
+        const b = document.createElement("div"); b.className="v"; b.innerText = String(props[k]).slice(0,60);
+        item.appendChild(a); item.appendChild(b);
+        list.appendChild(item);
+      });
+
+      // Chart - provide numeric properties
+      createDetailChart(props);
+
+      // set download button behavior
+      document.getElementById('downloadFeature').onclick = ()=> downloadFeature(layerName, feature);
+      document.getElementById('copyProps').onclick = ()=> {
+        try{ navigator.clipboard.writeText(JSON.stringify(props, null, 2)); showToast("Properties copied", "success"); }catch(e){ showToast("Copy failed", "error"); }
+      };
+    }
+
+    // Create chart from numeric properties
+    let detailChart = null;
+    function createDetailChart(props){
+      const ctx = document.getElementById('detailChart').getContext('2d');
+      const numericKeys = [];
+      for (const k in props){
+        const v = props[k];
+        if ((typeof v === "number") || (!isNaN(Number(v)) && String(v).length < 14)) numericKeys.push(k);
+        if (numericKeys.length >= 6) break;
+      }
+      let labels = [], data = [];
+      if (numericKeys.length === 0){
+        labels = ["metric A","metric B","metric C"];
+        data = [Math.random()*100, Math.random()*200, Math.random()*50];
+      } else {
+        labels = numericKeys;
+        data = numericKeys.map(k => Number(props[k]) || 0);
+      }
+      if (detailChart) detailChart.destroy();
+      detailChart = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: labels, datasets: [{ label: 'Value', data: data }]},
+        options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{ticks:{color:'#bfeaf6'}}, y:{ticks:{color:'#bfeaf6'}}}}
+      });
+    }
+
+    // Download a single feature via backend
+    async function downloadFeature(layerName, feature){
+      try{
+        const id_prop_candidates = ["COUNTY_NAM","const_nam","NAME_1","name","id","OBJECTID","objectid"];
+        let id_prop = null;
+        for (const k of id_prop_candidates){ if (feature.properties && feature.properties[k]) { id_prop = k; break; } }
+        const id_val = feature.properties && (feature.properties[id_prop] || feature.properties.COUNTY_NAM || feature.properties.const_nam || feature.properties.NAME_1);
+        if (!id_val) return showToast("Cannot determine feature id", "error");
+        const body = { layer: (layerName==="counties"?"counties": (layerName==="constituency"?"constituency":"kenya")), id_prop: id_prop, id_val: id_val, filename: id_val };
+        const res = await fetch(API.DOWNLOAD, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) });
+        if (!res.ok){
+          const err = await res.json().catch(()=>({error:"download failed"}));
+          throw new Error(err.error || res.statusText);
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a"); a.href = url; a.download = String(id_val)+".geojson"; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+        showToast("Downloaded " + id_val, "success");
+      }catch(e){ console.error(e); showToast("Download failed: "+e.message, "error"); }
+    }
+
+    // ============================
+    // Actions & Controls
+    // ============================
+    document.getElementById('refreshBtn').addEventListener('click', ()=>{ loadAll(true); showToast("Refreshing layers...", "info"); });
+    document.getElementById('toggleSidebar').addEventListener('click', ()=> document.getElementById('sidebar').classList.toggle('hidden'));
+    document.getElementById('closeSide').addEventListener('click', ()=> document.getElementById('sidebar').classList.add('hidden'));
+
+    // Mode toggles (System / Green / Yellow)
+    document.getElementById('modeSystem').addEventListener('click', ()=> setMode('system'));
+    document.getElementById('modeGreen').addEventListener('click', ()=> setMode('green'));
+    document.getElementById('modeYellow').addEventListener('click', ()=> setMode('yellow'));
+
+    async function setMode(m){
+      try{
+        if (!['system','green','yellow'].includes(m)) return;
+        currentMode = m;
+        // call backend route to set mode (optional)
+        try { await fetch(`/set_mode/${m}`); } catch(e){ /* ignore */ }
+        applyModeStyles();
+        showToast("Switched to " + m + " mode", "success");
+      }catch(e){ console.error(e); showToast("Mode switch failed", "error"); }
+    }
+
+    function applyModeStyles(){
+      // apply subtle color theme to UI
+      if (currentMode === 'green'){
+        document.documentElement.style.setProperty('--accent', '#43a047');
+        document.documentElement.style.setProperty('--panel', '#072115');
+        document.documentElement.style.setProperty('--muted', '#9fd7b4');
+      } else if (currentMode === 'yellow'){
+        document.documentElement.style.setProperty('--accent', '#f9a825');
+        document.documentElement.style.setProperty('--panel', '#2b2008');
+        document.documentElement.style.setProperty('--muted', '#f7e7b3');
+      } else {
+        // system
+        document.documentElement.style.setProperty('--accent', '#0fb5d6');
+        document.documentElement.style.setProperty('--panel', '#081626');
+        document.documentElement.style.setProperty('--muted', '#97a7b6');
+      }
+      // refresh legend colors (they use colorForName, unchanged) and UI buttons
+    }
+
+    // Locate me button
+    document.getElementById('locate').addEventListener('click', ()=> {
+      map.locate({ setView:true, maxZoom:12 });
+    });
+    map.on('locationerror', (e)=> showToast("Location failed: "+e.message,"error"));
+
+    // Measure tool (simple two-click measure)
+    let measuring=false; let measurePoints=[];
+    document.getElementById('measure').addEventListener('click', ()=> {
+      measuring = !measuring;
+      measurePoints=[];
+      showToast(measuring? "Measuring mode: click two points on map" : "Measure canceled", "info");
+      map.getContainer().style.cursor = measuring? "crosshair":"";
+    });
+    map.on('click', (e)=>{
+      if (!measuring) return;
+      measurePoints.push(e.latlng);
+      if (measurePoints.length === 2){
+        const d = map.distance(measurePoints[0], measurePoints[1]);
+        showToast("Distance: " + (d/1000).toFixed(3) + " km", "success", 6000);
+        measurePoints=[]; measuring=false; map.getContainer().style.cursor="";
+      }
+    });
+
+    // Clear selection
+    document.getElementById('clearSel').addEventListener('click', ()=>{
+      if (selectedLayer){
+        try{ if (countiesLayer && countiesLayer.resetStyle) countiesLayer.resetStyle(selectedLayer); if (constituencyLayer && constituencyLayer.resetStyle) constituencyLayer.resetStyle(selectedLayer); }catch(e){}
+        selectedLayer = null;
+        document.getElementById('sidebar').classList.add('hidden');
+        showToast("Selection cleared", "info");
+      }
+    });
+
+    // ============================
+    // Load all layers
+    // ============================
+    async function loadAll(force=false){
+      await Promise.all([ loadCounties(force), loadConstituencies(force), loadMiniMap() ]);
+      // update stats
+      try {
+        const res = await fetch('/meta');
+        if (res.ok){
+          const info = await res.json();
+          document.getElementById('statFeatures').innerText = (countiesLayer? countiesLayer.getLayers().length : '—');
+          // compute area estimate if Shape_Area property exists
+          let tot = 0;
+          if (countiesLayer) countiesLayer.eachLayer(l=> { const a = l.feature && (l.feature.properties.Shape_Area || l.feature.properties.st_area_sh); if (a) tot += Number(a); });
+          document.getElementById('statArea').innerText = tot? Number(tot).toFixed(2) : "—";
+        }
+      }catch(e){}
+    }
+
+    // initial load
+    loadAll();
+
+    // keyboard shortcuts
+    document.addEventListener('keydown', (e)=>{
+      if (e.key === 'Escape') document.getElementById('sidebar').classList.add('hidden');
+      if (e.key === 'f' && (e.ctrlKey || e.metaKey)){ map.setView([0.0236,37.9062],6); e.preventDefault(); }
+    });
+
+    // apply initial UI mode
+    applyModeStyles();
+
+    // expose copyProps helper to popup
+    window.copyProps = function(){
+      try{ if (!currentFeatureMeta) return showToast("No feature selected", "error"); navigator.clipboard.writeText(JSON.stringify(currentFeatureMeta.properties, null,2)); showToast("Copied properties", "success"); } catch(e){ showToast("Copy failed","error"); }
+    };
+
+    // ============================
+    // Misc helpers & graceful behavior
+    // ============================
+    // If EE isn't available, server falls back to local files (it will respond accordingly)
+    // Add health check polling to inform users when server backend fails
+    async function checkHealth(){
+      try{
+        const res = await fetch(API.HEALTH);
+        if (!res.ok) { showToast("Server health error", "error"); return; }
+        const j = await res.json();
+        if (!j.ee || !j.ee.ok) {
+          // show subtle notice
+          console.warn("EE not initialized:", j.ee);
+        }
+      }catch(e){
+        console.warn("Health check failed", e);
+      }
+    }
+    setInterval(checkHealth, 60000);
+    checkHealth();
+
+    // ============================
+    // End script
+    // ============================
+  </script>
+</body>
+</html>
